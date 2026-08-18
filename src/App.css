@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body, input, select, textarea, button {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  /* Usá la clase .font-serif para los títulos que quieras con la fuente Fraunces */
+  .font-serif {
+    font-family: 'Fraunces', serif;
+  }
+}
