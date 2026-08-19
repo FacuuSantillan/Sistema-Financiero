@@ -17,10 +17,10 @@ import ModalDirectorio from "./componentes/barraSuperior/modalDirectorio/ModalDi
 import BotonesDeAccion from './componentes/botonesDeAccion/BotonesDeAccion'
 import ModalFichaPrestamo from './componentes/botonesDeAccion/ModalesBotones/ModalFichaPrestamo'
 import PanoramaEstadisticas from './componentes/panoramaEstadisticas/PanoramaEstadisticas'
-import GraficoEstadistico from './componentes/panoramaEstadisticas/GraficoEstadistico'
 import ModalAdmin from './componentes/botonesDeAccion/ModalesBotones/ModalAdmin'
 import RegistrosRecientes from './componentes/Registros/RegistrosRecientes'
 import ModalEditarInversionista from './componentes/barraSuperior/modalDirectorio/ModalEditarInversionista'
+import GraficoEstadistico from './componentes/PanoramaEstadisticas/GraficoEstadistico'
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
