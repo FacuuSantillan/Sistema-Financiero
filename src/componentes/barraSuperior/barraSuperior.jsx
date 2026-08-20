@@ -1,6 +1,6 @@
 import React from "react";
 import { Landmark, Users, Briefcase, Wallet } from "lucide-react";
-import FiltroProvincia from "./FiltroPorProvincia";
+import FiltroProvincia from "./filtroPorProvincia";
 
 export default function BarraSuperior({ 
 
