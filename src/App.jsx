@@ -7,16 +7,16 @@ import { supabase } from './lib/supabaseClient'
 import Login from './componentes/auth/Login'
 
 // Componentes del Dashboard
-import BarraSuperior from './componentes/barraSuperior/BarraSuperior'
-import ModalInversionista from './componentes/botonesDeAccion/ModalesBotones/modalInversionista'
-import ModalCliente from './componentes/botonesDeAccion/ModalesBotones/modalClientes'
+import BarraSuperior from './componentes/barraSuperior/barraSuperior'
+import ModalInversionista from './componentes/botonesDeAccion/ModalesBotones/ModalInversionista'
+import ModalCliente from './componentes/botonesDeAccion/ModalesBotones/ModalClientes'
 import ModalAgregarOpcionPrestamo from './componentes/botonesDeAccion/ModalesBotones/ModalAgregarOpcionPrestamo'
-import ModalAgregarPrestamo from "./componentes/botonesDeAccion/ModalesBotones/ModalAgregarPrestamo"
+import ModalAgregarPrestamo from './componentes/botonesDeAccion/ModalesBotones/ModalAgregarPrestamo'
 import ModalPago from './componentes/botonesDeAccion/ModalesBotones/ModalAgregarPago'
-import ModalDirectorio from "./componentes/barraSuperior/modalDirectorio/ModalDirectorio"
+import ModalDirectorio from './componentes/barraSuperior/modalDirectorio/ModalDirectorio'
 import BotonesDeAccion from './componentes/botonesDeAccion/BotonesDeAccion'
 import ModalFichaPrestamo from './componentes/botonesDeAccion/ModalesBotones/ModalFichaPrestamo'
-import PanoramaEstadisticas from './componentes/panoramaEstadisticas/PanoramaEstadisticas'
+import PanoramaEstadisticas from './componentes/PanoramaEstadisticas/PanoramaEstadisticas'
 import ModalAdmin from './componentes/botonesDeAccion/ModalesBotones/ModalAdmin'
 import RegistrosRecientes from './componentes/Registros/RegistrosRecientes'
 import ModalEditarInversionista from './componentes/barraSuperior/modalDirectorio/ModalEditarInversionista'
