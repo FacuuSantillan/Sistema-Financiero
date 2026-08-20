@@ -8,7 +8,8 @@ import {
   ReceiptText, 
   BadgePercent 
 } from "lucide-react";
-import FiltroProvincia from "../barraSuperior/FiltroPorProvincia";
+
+import filtroProvincia from "../barraSuperior/filtroPorProvincia";
 
 export default function BotonesDeAccion({ 
   onOpenModal, 
