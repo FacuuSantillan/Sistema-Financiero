@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { User, Lock, Mail, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react'
+import { Lock, Mail, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import backgroundImage from '../../assets/background.jpg'
 
@@ -37,44 +37,42 @@ export default function Login({ onLoginSuccess }) {
 
   return (
     <div 
-      className="min-h-screen w-full flex flex-col justify-between items-center p-6 relative overflow-hidden select-none bg-cover bg-center bg-no-repeat"
+      className="min-h-screen w-full flex flex-col justify-center items-center p-6 relative overflow-hidden select-none bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: `url(${backgroundImage})` }}
     >
-      {/* Capa de oscurecimiento / gradiente sobre la foto para contraste */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0b3b36]/85 via-[#082824]/90 to-[#041412]/95 backdrop-blur-[2px] z-0" />
+      {/* Capa de oscurecimiento suave para fondo elegante */}
+      <div className="absolute inset-0 bg-[#061e1b]/80 backdrop-blur-[1px] z-0" />
 
-      {/* Luces sutiles de acento */}
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#148b81]/20 rounded-full blur-3xl pointer-events-none z-0" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-[#0d6b63]/25 rounded-full blur-3xl pointer-events-none z-0" />
-
-      {/* Cabecera / Identidad */}
-      <header className="w-full max-w-md pt-4 sm:pt-12 text-center z-10">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0d6b63] text-white shadow-xl shadow-black/30 border border-white/15 mb-4">
-          <ShieldCheck className="w-7 h-7" />
+      {/* Contenedor central unificado */}
+      <div className="w-full max-w-md flex flex-col items-center z-10 space-y-6">
+        
+        {/* Cabecera / Identidad de Marca */}
+        <div className="flex flex-col items-center text-center space-y-2">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#0d6b63] text-white shadow-xl shadow-black/20 border border-white/20">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div className="space-y-0.5">
+            <h1 className="text-4xl sm:text-5xl font-serif font-bold text-white tracking-tight drop-shadow-sm">
+              Valora
+            </h1>
+            <p className="text-[10px] sm:text-xs font-semibold text-emerald-300/85 tracking-[0.28em] uppercase font-sans">
+              Sistema Financiero
+            </p>
+          </div>
         </div>
-      
-       <div className="text-center mt-2 space-y-1">
-  <h1 className="text-4xl sm:text-5xl font-serif font-bold text-white tracking-tight drop-shadow-sm">
-    Valora
-  </h1>
-  <p className="text-[10px] sm:text-xs font-sans font-semibold text-emerald-300/80 tracking-[0.3em] uppercase">
-    Sistema Financiero
-  </p>
-</div>
-      </header>
 
-      {/* Tarjeta de Formulario Glassmorphism */}
-      <main className="w-full max-w-md my-auto py-6 z-10">
-        <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-7 sm:p-9 shadow-2xl shadow-black/40 border border-white/40">
-          
+        {/* Tarjeta de Formulario */}
+        <div className="w-full bg-white/95 backdrop-blur-xl rounded-3xl p-7 sm:p-8 shadow-2xl shadow-black/40 border border-white/40">
           <div className="mb-6">
             <h2 className="text-xl font-serif font-bold text-slate-900">Iniciar Sesión</h2>
-           
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Ingresá tus credenciales para acceder al panel
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            {/* Input Correo */}
+            {/* Campo Correo */}
             <div className="space-y-1.5">
               <label className="block text-[11px] font-bold tracking-wider uppercase text-slate-600">
                 Correo Electrónico
@@ -93,7 +91,7 @@ export default function Login({ onLoginSuccess }) {
               </div>
             </div>
 
-            {/* Input Contraseña */}
+            {/* Campo Contraseña */}
             <div className="space-y-1.5">
               <label className="block text-[11px] font-bold tracking-wider uppercase text-slate-600">
                 Contraseña
@@ -112,15 +110,15 @@ export default function Login({ onLoginSuccess }) {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 p-1 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  className="absolute right-3.5 p-1 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
-            {/* Opciones adicionales */}
-            <div className="flex items-center justify-between text-xs pt-1">
+            {/* Opciones */}
+            <div className="flex items-center justify-between text-xs pt-0.5">
               <label className="flex items-center gap-2 text-slate-600 font-medium cursor-pointer">
                 <input
                   type="checkbox"
@@ -138,7 +136,7 @@ export default function Login({ onLoginSuccess }) {
               </button>
             </div>
 
-            {/* Alerta de Error */}
+            {/* Error */}
             {errorMsg && (
               <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-600 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -146,11 +144,11 @@ export default function Login({ onLoginSuccess }) {
               </div>
             )}
 
-            {/* Botón de Entrada */}
+            {/* Botón Ingresar */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-[#0d6b63] hover:bg-[#0b5a52] text-white font-bold text-sm tracking-wider uppercase shadow-lg shadow-[#0d6b63]/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-[#0d6b63] hover:bg-[#0b5a52] text-white font-bold text-xs sm:text-sm tracking-wider uppercase shadow-lg shadow-[#0d6b63]/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -161,18 +159,15 @@ export default function Login({ onLoginSuccess }) {
                 </>
               )}
             </button>
-
           </form>
         </div>
-      </main>
 
-      {/* Pie de página */}
-      <footer className="w-full text-center py-4 z-10">
-        <p className="text-[11px] font-medium text-emerald-100/70">
-          Plataforma de Control Financiero © 2026. Todos los derechos reservados.
+        {/* Footer integrado */}
+        <p className="text-[11px] font-medium text-emerald-100/70 text-center">
+          Plataforma de Control Financiero © {new Date().getFullYear()}. Todos los derechos reservados.
         </p>
-      </footer>
 
+      </div>
     </div>
   )
 }
