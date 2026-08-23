@@ -48,7 +48,7 @@ export default function Login({ onLoginSuccess }) {
       <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-[#0d6b63]/25 rounded-full blur-3xl pointer-events-none z-0" />
 
       {/* Cabecera / Identidad */}
-      <header className="w-full max-w-md pt-8 sm:pt-12 text-center z-10">
+      <header className="w-full max-w-md pt-4 sm:pt-12 text-center z-10">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0d6b63] text-white shadow-xl shadow-black/30 border border-white/15 mb-4">
           <ShieldCheck className="w-7 h-7" />
         </div>
