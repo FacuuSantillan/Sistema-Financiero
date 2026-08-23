@@ -53,9 +53,14 @@ export default function Login({ onLoginSuccess }) {
           <ShieldCheck className="w-7 h-7" />
         </div>
       
-        <h1 className="text-3xl sm:text-3xl font-serif font-bold text-white tracking-tight mt-1">
-         VALORA - SISTEMA FINANCIERO
-        </h1>
+       <div className="text-center mt-2 space-y-1">
+  <h1 className="text-4xl sm:text-5xl font-serif font-bold text-white tracking-tight drop-shadow-sm">
+    Valora
+  </h1>
+  <p className="text-[10px] sm:text-xs font-sans font-semibold text-emerald-300/80 tracking-[0.3em] uppercase">
+    Sistema Financiero
+  </p>
+</div>
       </header>
 
       {/* Tarjeta de Formulario Glassmorphism */}
