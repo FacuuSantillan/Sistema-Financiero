@@ -52,11 +52,9 @@ export default function Login({ onLoginSuccess }) {
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0d6b63] text-white shadow-xl shadow-black/30 border border-white/15 mb-4">
           <ShieldCheck className="w-7 h-7" />
         </div>
-        <span className="text-[11px] font-bold tracking-[0.25em] uppercase text-emerald-300 block">
+      
+        <h1 className="text-3xl sm:text-3xl font-serif font-bold text-white tracking-tight mt-1">
           SISTEMA FINANCIERO
-        </span>
-        <h1 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight mt-1">
-          Gestión & Capital
         </h1>
       </header>
 
@@ -66,9 +64,7 @@ export default function Login({ onLoginSuccess }) {
           
           <div className="mb-6">
             <h2 className="text-xl font-serif font-bold text-slate-900">Iniciar Sesión</h2>
-            <p className="text-xs font-medium text-slate-500 mt-1">
-              Ingresá tus credenciales para acceder al panel de control
-            </p>
+           
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -155,7 +151,7 @@ export default function Login({ onLoginSuccess }) {
                 <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Ingresar al Sistema</span>
+                  <span>Ingresar</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -168,7 +164,7 @@ export default function Login({ onLoginSuccess }) {
       {/* Pie de página */}
       <footer className="w-full text-center py-4 z-10">
         <p className="text-[11px] font-medium text-emerald-100/70">
-          Plataforma de Control Financiero & Custodia de Cartera
+          Plataforma de Control Financiero © 2026. Todos los derechos reservados.
         </p>
       </footer>
 
