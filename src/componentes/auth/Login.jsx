@@ -1,187 +1,176 @@
 import React, { useState } from 'react'
-import { User, Lock, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { User, Lock, Mail, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import backgroundImage from '../../assets/background.jpg'
 
 export default function Login({ onLoginSuccess }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [mostrarPassword, setMostrarPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setErrorMsg('')
 
-    const emailLimpio = email.trim()
-
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: emailLimpio,
-        password: password,
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim()
       })
 
-      if (authError) {
-        console.error('Error Auth Supabase:', authError)
-        if (authError.message.includes('Invalid login credentials')) {
-          throw new Error('Correo o contraseña incorrectos.')
-        } else if (authError.message.includes('Email not confirmed')) {
-          throw new Error('El correo electrónico aún no ha sido confirmado.')
-        } else {
-          throw authError
-        }
-      }
+      if (error) throw error
 
-      const user = authData.user
-
-      const { data: usuarioData, error: userError } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle()
-
-      if (userError) {
-        console.warn('Error leyendo tabla usuarios:', userError.message)
-      }
-
-      const rolDefectuoso = emailLimpio.includes('admin') ? 'admin' : 'inversionista'
-      
-      const perfilCompleto = {
-        ...user,
-        rol: usuarioData?.rol || rolDefectuoso,
-        nombre: usuarioData?.nombre_completo || usuarioData?.nombre || user.email
-      }
-
-      if (typeof onLoginSuccess === 'function') {
-        onLoginSuccess(perfilCompleto)
+      if (onLoginSuccess) {
+        onLoginSuccess(data.user)
       }
     } catch (err) {
-      console.error('Error en login:', err)
-      setErrorMsg(err.message || 'Error al conectar con el servidor.')
+      console.error('Error de autenticación:', err)
+      setErrorMsg(err.message || 'Credenciales inválidas. Verificá tu correo y contraseña.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden select-none">
-      
-            <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat blur-xl "
-        style={{ backgroundImage: `url(${backgroundImage})` }}
-      />
+    <div 
+      className="min-h-screen w-full flex flex-col justify-between items-center p-6 relative overflow-hidden select-none bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url(${backgroundImage})` }}
+    >
+      {/* Capa de oscurecimiento / gradiente sobre la foto para contraste */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#0b3b36]/85 via-[#082824]/90 to-[#041412]/95 backdrop-blur-[2px] z-0" />
 
-      <div className="relative z-10 flex h-full w-full items-center justify-center p-4">
-        
-        <div className="w-[70%] max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[60%]">
+      {/* Luces sutiles de acento */}
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#148b81]/20 rounded-full blur-3xl pointer-events-none z-0" />
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-[#0d6b63]/25 rounded-full blur-3xl pointer-events-none z-0" />
+
+      {/* Cabecera / Identidad */}
+      <header className="w-full max-w-md pt-8 sm:pt-12 text-center z-10">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#0d6b63] text-white shadow-xl shadow-black/30 border border-white/15 mb-4">
+          <ShieldCheck className="w-7 h-7" />
+        </div>
+        <span className="text-[11px] font-bold tracking-[0.25em] uppercase text-emerald-300 block">
+          SISTEMA FINANCIERO
+        </span>
+        <h1 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight mt-1">
+          Gestión & Capital
+        </h1>
+      </header>
+
+      {/* Tarjeta de Formulario Glassmorphism */}
+      <main className="w-full max-w-md my-auto py-6 z-10">
+        <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-7 sm:p-9 shadow-2xl shadow-black/40 border border-white/40">
           
-          <div className="md:w-1/2 bg-gradient-to-br from-[#148330] to-[#084842] p-8 text-white flex flex-col justify-center relative overflow-hidden shrink-0">
-            <div className="relative z-10 space-y-3">
-              <span className="text-[10px] font-bold tracking-widest uppercase text-emerald-200">
-                SISTEMA PRESTAMISTAS
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-serif font-bold leading-tight">
-                Gestión y Control Financiero
-              </h2>
-            </div>
-
-            <svg
-              className="absolute -right-1 bottom-0 top-0 h-full w-20 text-white hidden md:block"
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              fill="currentColor"
-            >
-              <path d="M0 0 C 60 20, 20 80, 100 100 L 100 0 Z" />
-            </svg>
+          <div className="mb-6">
+            <h2 className="text-xl font-serif font-bold text-slate-900">Iniciar Sesión</h2>
+            <p className="text-xs font-medium text-slate-500 mt-1">
+              Ingresá tus credenciales para acceder al panel de control
+            </p>
           </div>
 
-          {/* PANEL DERECHO */}
-          <div className="md:w-1/2 p-6 sm:p-8 bg-white flex flex-col justify-center space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             
-            <div className="flex flex-col items-center mb-1">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#148330] to-[#0d6b63] flex items-center justify-center text-white shadow-md">
-                <User className="w-7 h-7 stroke-[1.8]" />
-              </div>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-3.5">
-              
+            {/* Input Correo */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold tracking-wider uppercase text-slate-600">
+                Correo Electrónico
+              </label>
               <div className="relative flex items-center">
-                <Mail className="w-4 h-4 absolute left-3.5 text-slate-400" />
+                <Mail className="w-4 h-4 absolute left-4 text-slate-400 pointer-events-none" />
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Correo Electrónico"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-100/90 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0d6b63]/30 transition-all"
+                  placeholder="ejemplo@empresa.com"
+                  className="w-full pl-11 pr-4 py-3 bg-[#FAF8F5] rounded-2xl border border-slate-200 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0d6b63]/20 focus:border-[#0d6b63] transition-all"
                 />
               </div>
+            </div>
 
+            {/* Input Contraseña */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold tracking-wider uppercase text-slate-600">
+                Contraseña
+              </label>
               <div className="relative flex items-center">
-                <Lock className="w-4 h-4 absolute left-3.5 text-slate-400" />
+                <Lock className="w-4 h-4 absolute left-4 text-slate-400 pointer-events-none" />
                 <input
-                  type={mostrarPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Contraseña"
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-100/90 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0d6b63]/30 transition-all"
+                  placeholder="••••••••••••"
+                  className="w-full pl-11 pr-11 py-3 bg-[#FAF8F5] rounded-2xl border border-slate-200 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0d6b63]/20 focus:border-[#0d6b63] transition-all"
                 />
                 <button
                   type="button"
-                  onClick={() => setMostrarPassword(!mostrarPassword)}
-                  className="absolute right-3.5 text-slate-400 hover:text-slate-600 transition-colors"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 p-1 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                 >
-                  {mostrarPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+            </div>
 
-              <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium px-0.5">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-[#0d6b63] rounded border-slate-300 cursor-pointer"
-                  />
-                  <span>Recordarme</span>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={() => alert('Por favor contactá al administrador para restablecer tu clave.')}
-                  className="hover:text-[#0d6b63] transition-colors cursor-pointer"
-                >
-                  ¿Olvidaste tu clave?
-                </button>
-              </div>
-
-              {errorMsg && (
-                <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2 text-xs font-semibold text-red-700">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
+            {/* Opciones adicionales */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label className="flex items-center gap-2 text-slate-600 font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded-md border-slate-300 text-[#0d6b63] focus:ring-[#0d6b63]/30 cursor-pointer accent-[#0d6b63]"
+                />
+                <span>Recordarme</span>
+              </label>
               <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-[#084842] to-[#0d6b63] hover:from-[#05312d] hover:to-[#084842] active:scale-[0.99] text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer disabled:opacity-50 mt-2"
+                type="button"
+                className="text-[#0d6b63] font-semibold hover:underline cursor-pointer"
               >
-                {loading ? 'INGRESANDO...' : 'ENTRAR'}
+                ¿Olvidaste tu clave?
               </button>
+            </div>
 
-            </form>
+            {/* Alerta de Error */}
+            {errorMsg && (
+              <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-600 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
 
-          </div>
+            {/* Botón de Entrada */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-[#0d6b63] hover:bg-[#0b5a52] text-white font-bold text-sm tracking-wider uppercase shadow-lg shadow-[#0d6b63]/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+            >
+              {loading ? (
+                <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>Ingresar al Sistema</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
 
+          </form>
         </div>
+      </main>
 
-      </div>
+      {/* Pie de página */}
+      <footer className="w-full text-center py-4 z-10">
+        <p className="text-[11px] font-medium text-emerald-100/70">
+          Plataforma de Control Financiero & Custodia de Cartera
+        </p>
+      </footer>
 
     </div>
   )
