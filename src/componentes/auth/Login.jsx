@@ -54,7 +54,7 @@ export default function Login({ onLoginSuccess }) {
         </div>
       
         <h1 className="text-3xl sm:text-3xl font-serif font-bold text-white tracking-tight mt-1">
-          SISTEMA FINANCIERO
+         VALORA - SISTEMA FINANCIERO
         </h1>
       </header>
 
