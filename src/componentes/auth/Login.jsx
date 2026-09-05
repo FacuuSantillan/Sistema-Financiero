@@ -41,11 +41,11 @@ export default function Login({ onLoginSuccess }) {
       style={{ backgroundImage: `url(${backgroundImage})` }}
     >
       {/* Capa de oscurecimiento suave para fondo elegante */}
-      <div className="absolute inset-0 bg-[#061e1b]/80 backdrop-blur-[1px] z-0" />
+<div className="absolute inset-0 bg-[#061e1b]/80 backdrop-blur-[1px] z-0" />
 
       {/* Contenedor central unificado */}
-      <div className="w-full max-w-md flex flex-col items-center z-10 space-y-6">
-        
+<div className="w-full max-w-md flex flex-col items-center z-10 space-y-6">
+          
         {/* Cabecera / Identidad de Marca */}
         <div className="flex flex-col items-center text-center space-y-2">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#0d6b63] text-white shadow-xl shadow-black/20 border border-white/20">

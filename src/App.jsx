@@ -154,7 +154,7 @@ export default function App() {
   const esAdmin = usuario.rol === 'admin' || usuario.rol === 'owner'
 
   return (
-    <div key={`${usuario.id}-${usuario.rol}-${refreshKey}`} className="min-h-screen bg-paper pb-12">
+    <div key={`${usuario.id}-${usuario.rol}-${refreshKey}`} className="min-h-screen bg-paper pb-12 safe-pt safe-px">
       {/* Barra de usuario y Logout */}
       <div className="w-[95%] mx-auto pt-3 flex items-center justify-between text-xs font-medium text-slate-600 border-b border-line/60 pb-2 mb-2">
         <div className="flex items-center gap-2">
