@@ -2,27 +2,37 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Panel de Control - Préstamos</title>
+    <!-- viewport-fit=cover permite ocupar el notch y la barra inferior -->
+    <meta 
+      name="viewport" 
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" 
+    />
+    <title>Valora - Sistema Financiero</title>
 
-    <!-- Ícono oficial para pantalla de inicio en iOS (iPhone / iPad) -->
+    <!-- Web App Manifest (imprescindible para Android / PWA) -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0d6b63" />
+
+    <!-- Configuración iOS (iPhone / iPad) -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-
-    <!-- Configuración de App Nativa para Safari en iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- Con black-translucent el contenido se extiende detrás del notch y la barra superior -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Finanzas" />
+    <meta name="apple-mobile-web-app-title" content="Valora" />
 
-    <!-- Favicon estándar para navegadores -->
+    <!-- Configuración Android / Chrome Standalone -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Favicon estándar -->
     <link rel="icon" type="image/png" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-    <!-- Fuentes de Google Fonts -->
+    <!-- Fuentes -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   </head>
-  <body>
+  <body class="bg-[#FAF8F5] text-slate-900 overflow-x-hidden min-h-screen">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
