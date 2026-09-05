@@ -425,19 +425,25 @@ export default function ModalDirectorio({
               />
             </div>
             <div className="md:col-span-8 h-full overflow-hidden">
-              <FichaCliente
-                cliente={itemSeleccionado}
-                fetchingDetalle={fetchingDetalle}
-                referidoInfo={referidoInfo}
-                prestamos={prestamos}
-                pagos={pagos}
-                esInversionista={esInversionista}
-                actionLoading={actionLoading}
-                formatearFecha={formatearFecha}
-                onEditar={() => setModalEditarClienteOpen(true)}
-                onToggleEstado={() => handleToggleEstado(itemSeleccionado, 'clientes')}
-                onVerFichaPrestamo={onVerFichaPrestamo}
-              />
+            <FichaCliente
+            cliente={itemSeleccionado}
+            fetchingDetalle={fetchingDetalle}
+            referidoInfo={referidoInfo}
+            prestamos={prestamos}
+            pagos={pagos}
+            formatearFecha={formatearFecha}
+            esInversionista={esInversionista}
+            actionLoading={actionLoading}
+            onEditar={() => setModalEditarClienteOpen(true)}
+            onToggleEstado={() => handleToggleEstado(itemSeleccionado, 'clientes')}
+            onVerFichaPrestamo={onVerFichaPrestamo}
+            onSuccess={(idBorrado) => {
+              const idAEliminar = idBorrado || itemSeleccionado?.id
+              setLista((prev) => prev.filter((c) => c.id !== idAEliminar))
+              setItemSeleccionado(null)
+            }}
+            onClose={onClose}
+          />
             </div>
           </div>
         )}
