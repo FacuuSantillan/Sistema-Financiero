@@ -212,18 +212,6 @@ export default function ModalCliente({ isOpen, onClose, onSuccess, usuarioLoguea
         {/* Formulario */}
         <form onSubmit={handleSubmit} className="space-y-4">
           
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-              Tipo de movimiento
-            </label>
-            <select
-              disabled
-              value="cliente"
-              className="w-full rounded-2xl border border-line bg-white/70 px-4 py-3 text-sm font-medium text-slate-800 cursor-not-allowed"
-            >
-              <option value="cliente">Cliente</option>
-            </select>
-          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
