@@ -31,6 +31,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
     esParcial: false
   })
 
+
   // 1. Cargar clientes al abrir el modal (iniciando siempre vacío)
   useEffect(() => {
     if (isOpen) {

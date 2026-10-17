@@ -128,41 +128,42 @@ export default function FichaCliente({
             </div>
           </div>
 
-          {!esInversionista && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onEditar}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-xs cursor-pointer"
-              >
-                <Edit2 className="w-3.5 h-3.5 text-[#0d6b63]" />
-                <span>Editar</span>
-              </button>
+         {!esInversionista && (
+  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0">
+    <button
+      onClick={onEditar}
+      className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-xs cursor-pointer min-w-[80px]"
+    >
+      <Edit2 className="w-3.5 h-3.5 text-[#0d6b63] shrink-0" />
+      <span>Editar</span>
+    </button>
 
-              <button
-                onClick={() => {
-                  setErrorBorrado(null)
-                  setModalConfirmacion(true)
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300 shadow-xs cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-red-600" />
-                <span>Borrar</span>
-              </button>
+    <button
+      onClick={() => {
+        setErrorBorrado(null)
+        setModalConfirmacion(true)
+      }}
+      disabled={eliminando}
+      className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300 shadow-xs cursor-pointer min-w-[80px] disabled:opacity-50"
+    >
+      <Trash2 className="w-3.5 h-3.5 text-red-600 shrink-0" />
+      <span>Borrar</span>
+    </button>
 
-              <button
-                onClick={onToggleEstado}
-                disabled={actionLoading}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                  estaActivo
-                    ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
-                    : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                }`}
-              >
-                <Power className="w-3.5 h-3.5" />
-                <span>{estaActivo ? 'Deshabilitar' : 'Habilitar'}</span>
-              </button>
-            </div>
-          )}
+    <button
+      onClick={onToggleEstado}
+      disabled={actionLoading}
+      className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+        estaActivo
+          ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+          : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+      }`}
+    >
+      <Power className="w-3.5 h-3.5 shrink-0" />
+      <span>{estaActivo ? 'Deshabilitar' : 'Habilitar'}</span>
+    </button>
+  </div>
+)}  
         </div>
 
         {/* Préstamos del Cliente */}
