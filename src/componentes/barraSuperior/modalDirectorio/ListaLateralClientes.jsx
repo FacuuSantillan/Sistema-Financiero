@@ -15,7 +15,7 @@ export default function ListaLateralClientes({
 }) {
   return (
     <div className={`flex flex-col h-full overflow-hidden ${
-      mostrarBordeDerecho ? 'border-r border-line/60 pr-0 md:pr-4' : 'border-l border-line/60 pl-0 md:pl-4'
+      mostrarBordeDerecho ? 'md:border-r border-line/60 pr-0 md:pr-4' : 'md:border-l border-line/60 pl-0 md:pl-4'
     }`}>
       {/* Buscador */}
       <div className="relative mb-3 shrink-0">
@@ -49,10 +49,11 @@ export default function ListaLateralClientes({
             const esSeleccionado = itemSeleccionado?.id === item.id
 
             return (
-              <div
+              <button
+                type="button"
                 key={item.id}
                 onClick={() => onSeleccionarItem(item)}
-                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                className={`w-full text-left p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between active:scale-[0.99] ${
                   esSeleccionado
                     ? 'bg-[#0d6b63] text-white border-[#0d6b63] shadow-sm'
                     : 'bg-white border-line text-slate-800 hover:border-[#0d6b63]/40'
@@ -73,8 +74,8 @@ export default function ListaLateralClientes({
                     Tel: {item.telefono || 'Sin teléfono'}
                   </span>
                 </div>
-                <ChevronRight className={`w-4 h-4 ${esSeleccionado ? 'opacity-70' : 'text-slate-400'}`} />
-              </div>
+                <ChevronRight className={`w-4 h-4 shrink-0 ${esSeleccionado ? 'opacity-70' : 'text-slate-400'}`} />
+              </button>
             )
           })
         )}

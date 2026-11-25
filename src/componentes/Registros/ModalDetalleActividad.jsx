@@ -66,8 +66,8 @@ export default function ModalDetalleActividad({ isOpen, onClose, actividad, form
   const valorCuota = Number(rawItem.monto_cuota || 0) || (montoTotalPagar > 0 ? montoTotalPagar / cuotas : 0)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs select-none">
-      <div className="w-full max-w-2xl rounded-3xl bg-cream p-6 sm:p-8 shadow-2xl border border-line max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs select-none">
+      <div className="modal-panel w-full max-w-2xl rounded-3xl bg-cream p-6 sm:p-8 shadow-2xl border border-line max-h-[90vh] flex flex-col overflow-hidden">
         
         {/* Cabecera */}
         <div className="flex items-start justify-between pb-4 border-b border-line shrink-0">

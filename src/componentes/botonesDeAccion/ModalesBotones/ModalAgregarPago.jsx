@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { X, Receipt, AlertCircle } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
+import {
+  hoyLocalISO, fechaFormularioATimestamp, cronogramaConVencimientos, redondear2, TOLERANCIA_SALDO,
+  punitorioTotal, leerConfigPunitorio, guardarConfigPunitorio
+} from '../../../lib/finanzas'
+import CalculadoraPunitorio from '../../comunes/CalculadoraPunitorio'
 
 export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado = null }) {
   const [clientes, setClientes] = useState([])
@@ -9,13 +14,18 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
   const [loading, setLoading] = useState(false)
   const [fetchingPrestamos, setFetchingPrestamos] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [cuotasVencidas, setCuotasVencidas] = useState([])
+  const [configPunitorio, setConfigPunitorio] = useState(() => ({ aplicar: false, ...leerConfigPunitorio() }))
+  const punitorioCobro = configPunitorio.aplicar
+    ? punitorioTotal(cuotasVencidas, configPunitorio.tasa, configPunitorio.cadaDias)
+    : 0
 
   const [formData, setFormData] = useState({
     cliente_id: '',
     prestamo_id: '',
     monto_pago: '',
     metodo_pago: 'efectivo',
-    fecha_pago: new Date().toISOString().split('T')[0],
+    fecha_pago: hoyLocalISO(),
     observaciones: ''
   })
 
@@ -40,7 +50,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
         prestamo_id: '',
         monto_pago: '',
         metodo_pago: 'efectivo',
-        fecha_pago: new Date().toISOString().split('T')[0],
+        fecha_pago: hoyLocalISO(),
         observaciones: ''
       })
       setPrestamosCliente([])
@@ -62,7 +72,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
           .from('prestamos')
           .select('cliente_id')
           .eq('inversionista_id', invId)
-          .neq('estado', 'finalizado')
+          .not('estado', 'in', '(finalizado,cancelado)')
 
         if (errP) throw errP
 
@@ -85,7 +95,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
         const { data: prestamosActivos, error: errP } = await supabase
           .from('prestamos')
           .select('cliente_id')
-          .neq('estado', 'finalizado')
+          .not('estado', 'in', '(finalizado,cancelado)')
 
         if (errP) throw errP
 
@@ -129,7 +139,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
           .from('prestamos')
           .select('*')
           .eq('cliente_id', formData.cliente_id)
-          .neq('estado', 'finalizado')
+          .not('estado', 'in', '(finalizado,cancelado)')
 
         if (usuarioLogueado?.rol === 'inversionista' && usuarioLogueado?.id) {
           query = query.eq('inversionista_id', usuarioLogueado.id)
@@ -175,26 +185,16 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
         
         const montoTotalPagar = Number(prestamo.monto_total_pagar || 0)
         const cantidadCuotas = Math.max(1, Number(prestamo.cantidad_cuotas || 1))
-        
-        const montoCuotaCalculado = montoTotalPagar / cantidadCuotas
-        const montoCuota = Number(prestamo.monto_cuota) || montoCuotaCalculado || 0
-        
-        const saldoPendienteTotal = Math.max(0, montoTotalPagar - totalPagado)
 
-        const cuotasCompletadas = Math.floor(totalPagado / (montoCuota || 1))
-        const pagadoCuotaActual = totalPagado % (montoCuota || 1)
+        // Cálculo en centavos para evitar errores de coma flotante
+        const { saldoPendiente: saldoPendienteTotal, cuotaActual, cuotas } = cronogramaConVencimientos(prestamo, totalPagado)
+        setCuotasVencidas(saldoPendienteTotal > TOLERANCIA_SALDO ? cuotas.filter((c) => c.vencida) : [])
 
-        let numeroCuotaActual = cuotasCompletadas + 1
-        if (numeroCuotaActual > cantidadCuotas) {
-          numeroCuotaActual = cantidadCuotas
-        }
-
-        let pendienteCuotaActual = montoCuota - pagadoCuotaActual
-        if (pendienteCuotaActual > saldoPendienteTotal) {
-          pendienteCuotaActual = saldoPendienteTotal
-        }
-
-        const esParcial = pagadoCuotaActual > 0 && pagadoCuotaActual < montoCuota
+        const montoCuota = cuotaActual ? cuotaActual.monto : Number(prestamo.monto_cuota || 0)
+        const numeroCuotaActual = cuotaActual ? cuotaActual.numeroCuota : cantidadCuotas
+        const pagadoCuotaActual = cuotaActual ? cuotaActual.cubierto : 0
+        const pendienteCuotaActual = cuotaActual ? Math.min(cuotaActual.restante, saldoPendienteTotal) : 0
+        const esParcial = cuotaActual ? cuotaActual.estado === 'parcial' : false
 
         setDetalleCobro({
           montoTotalPagar,
@@ -221,6 +221,8 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
   }, [formData.prestamo_id, prestamosCliente])
 
   const resetDetalleCobro = () => {
+    setCuotasVencidas([])
+    setConfigPunitorio((c) => ({ ...c, aplicar: false }))
     setDetalleCobro({
       montoTotalPagar: 0,
       montoCuota: 0,
@@ -256,9 +258,15 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
       return
     }
 
-    const monto = parseFloat(formData.monto_pago || 0)
-    if (monto <= 0) {
+    const monto = redondear2(parseFloat(formData.monto_pago || 0))
+    if (!(monto > 0)) {
       setErrorMsg('El monto a cobrar debe ser mayor a 0.')
+      setLoading(false)
+      return
+    }
+
+    if (monto > detalleCobro.saldoPendienteTotal + 0.009) {
+      setErrorMsg(`El monto supera el saldo pendiente del préstamo ($${detalleCobro.saldoPendienteTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}).`)
       setLoading(false)
       return
     }
@@ -299,8 +307,19 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
         creado_por: usuarioId || null,
         monto_cobrado: monto,
         metodo_pago: formData.metodo_pago,
-        fecha_pago: formData.fecha_pago ? new Date(`${formData.fecha_pago}T12:00:00Z`).toISOString() : new Date().toISOString(),
+        fecha_pago: fechaFormularioATimestamp(formData.fecha_pago),
         observaciones: formData.observaciones?.trim() || null
+      }
+
+      // El punitorio se guarda aparte: no descuenta saldo de las cuotas
+      if (punitorioCobro > 0) {
+        payload.punitorio = punitorioCobro
+        payload.punitorio_detalle = {
+          tasa: Number(configPunitorio.tasa),
+          cada_dias: Math.max(1, Math.floor(Number(configPunitorio.cadaDias) || 1)),
+          cuotas: cuotasVencidas.map((c) => ({ numero: c.numeroCuota, dias_atraso: c.diasAtraso, saldo: c.restante }))
+        }
+        guardarConfigPunitorio({ tasa: Number(configPunitorio.tasa), cadaDias: Math.max(1, Math.floor(Number(configPunitorio.cadaDias) || 1)) })
       }
 
       const { data: pagoCreado, error: errorPago } = await supabase
@@ -315,9 +334,9 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
       const auditPayload = {
         tipo: 'COBRO',
         accion: 'COBRO',
-        titulo: `Ingreso $${monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
+        titulo: `Ingreso $${(monto + punitorioCobro).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
         subtitulo: `Cobro a ${nombreCliente}`,
-        detalles: `Método: ${formData.metodo_pago}${formData.observaciones ? ` · ${formData.observaciones.trim()}` : ''}`,
+        detalles: `Método: ${formData.metodo_pago}${punitorioCobro > 0 ? ` · Cuota: $${monto.toLocaleString('es-AR', { minimumFractionDigits: 2 })} + Punitorio: $${punitorioCobro.toLocaleString('es-AR', { minimumFractionDigits: 2 })}` : ''}${formData.observaciones ? ` · ${formData.observaciones.trim()}` : ''}`,
         persona: nombreCliente,
         autor_id: usuarioId || null,
         autor_nombre: autorNombre,
@@ -350,7 +369,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
 
       const montoTotalPagar = Number(prestamoActual?.monto_total_pagar || 0)
 
-      if (totalAcumuladoDB >= (montoTotalPagar - 0.50)) {
+      if (totalAcumuladoDB >= (montoTotalPagar - TOLERANCIA_SALDO)) {
         const { error: errorPrestamo } = await supabase
           .from('prestamos')
           .update({ estado: 'finalizado' })
@@ -372,8 +391,8 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs select-none">
-      <div className="w-full max-w-xl rounded-3xl bg-cream p-6 sm:p-8 shadow-2xl border border-line max-h-[92vh] overflow-y-auto">
+    <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs select-none">
+      <div className="modal-panel w-full max-w-xl rounded-3xl bg-cream p-6 sm:p-8 shadow-2xl border border-line max-h-[92vh] overflow-y-auto">
         
         {/* Cabecera */}
         <div className="flex items-start justify-between mb-6">
@@ -560,6 +579,15 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
             </div>
           </div>
 
+          <CalculadoraPunitorio cuotasVencidas={cuotasVencidas} config={configPunitorio} setConfig={setConfigPunitorio} />
+
+          {punitorioCobro > 0 && (
+            <div className="flex justify-between items-center p-3 rounded-xl bg-slate-900 text-white text-sm font-bold">
+              <span>Total a cobrar (cuota + punitorio)</span>
+              <span>${redondear2((parseFloat(formData.monto_pago) || 0) + punitorioCobro).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+            </div>
+          )}
+
           {errorMsg && (
             <p className="text-xs text-red-600 font-semibold bg-red-50 p-2.5 rounded-xl border border-red-200">
               ⚠️ {errorMsg}
@@ -567,7 +595,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
           )}
 
           {/* Botones de acción */}
-          <div className="flex justify-end items-center gap-3 pt-4">
+          <div className="form-acciones flex justify-end items-center gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}

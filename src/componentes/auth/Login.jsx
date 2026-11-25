@@ -3,13 +3,13 @@ import { Lock, Mail, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowRight } from 'l
 import { supabase } from '../../lib/supabaseClient'
 import backgroundImage from '../../assets/background.jpg'
 
-export default function Login({ onLoginSuccess }) {
+export default function Login({ onLoginSuccess, avisoInicial = '' }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
   const [loading, setLoading] = useState(false)
-  const [errorMsg, setErrorMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState(avisoInicial)
 
   const handleSubmit = async (e) => {
     e.preventDefault()

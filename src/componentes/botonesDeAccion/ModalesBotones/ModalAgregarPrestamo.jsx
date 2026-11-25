@@ -1,36 +1,31 @@
 import React, { useState, useEffect } from 'react'
-import { X, Calculator, CheckCircle2 } from 'lucide-react'
+import { X, Calculator } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
+import { hoyLocalISO, redondear2 } from '../../../lib/finanzas'
 
 export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuarioLogueado = null }) {
   const [planes, setPlanes] = useState([])
   const [clientes, setClientes] = useState([])
-  const [inversionistas, setInversionistas] = useState([])
 
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
-  const [inversionistaFijado, setInversionistaFijado] = useState(false)
 
   const [formData, setFormData] = useState({
     plan_id: '',
     cliente_id: '',
-    inversionista_id: '',
-    fecha_inicio: new Date().toISOString().split('T')[0],
+    fecha_inicio: hoyLocalISO(),
     cuota_seleccionada_index: 0
   })
 
-  // 1. Cargar Planes, Clientes e Inversionistas al abrir el modal
-// 1. Cargar Planes, Clientes e Inversionistas al abrir el modal
+  // 1. Cargar Planes y Clientes al abrir el modal
   useEffect(() => {
     if (!isOpen) return
 
     setErrorMsg('')
-    setInversionistaFijado(false)
     setFormData({
       plan_id: '',
       cliente_id: '',
-      inversionista_id: '',
-      fecha_inicio: new Date().toISOString().split('T')[0],
+      fecha_inicio: hoyLocalISO(),
       cuota_seleccionada_index: 0
     })
 
@@ -48,23 +43,12 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
         // B. Cargar Clientes Activos (usando los nombres exactos del esquema)
         const { data: dataClientes, error: errClientes } = await supabase
           .from('clientes')
-          .select('id, nombre_completo, inversionista_id')
+          .select('id, nombre_completo')
           .eq('activo', true)
           .order('nombre_completo', { ascending: true })
 
         if (errClientes) throw errClientes
         setClientes(dataClientes || [])
-
-        // C. Cargar Inversionistas desde 'usuarios'
-        const { data: dataInvs, error: errInvs } = await supabase
-          .from('usuarios')
-          .select('id, nombre_completo, rol')
-          .eq('rol', 'inversionista')
-          .order('nombre_completo', { ascending: true })
-
-        if (errInvs) throw errInvs
-        setInversionistas(dataInvs || [])
-
       } catch (err) {
         console.error('Error al cargar datos del modal:', err)
         setErrorMsg(err.message || 'No se pudieron cargar los datos iniciales.')
@@ -89,34 +73,9 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
   const montoCapital = Number(planSeleccionado?.monto || 0)
   const tasaInteres = Number(opcionCuotaActiva.interes || 0)
   const cantidadCuotas = Math.max(1, Number(opcionCuotaActiva.cuotas || 1))
-  const montoTotalDevolver = montoCapital > 0 ? montoCapital * (1 + tasaInteres / 100) : 0
-  const valorCuota = montoCapital > 0 ? montoTotalDevolver / cantidadCuotas : 0
+  const montoTotalDevolver = montoCapital > 0 ? redondear2(montoCapital * (1 + tasaInteres / 100)) : 0
+  const valorCuota = montoCapital > 0 ? redondear2(montoTotalDevolver / cantidadCuotas) : 0
   const frecuenciaPlan = planSeleccionado?.frecuencia_pago || 'mensual'
-
-  // Manejador del cambio de Cliente: Autodefine el Inversionista vinculado
- const handleClienteChange = (e) => {
-    const clienteId = e.target.value
-    const clienteEncontrado = clientes.find((c) => c.id === clienteId)
-
-    // Se vincula directamente con inversionista_id del esquema de la tabla clientes
-    const invAsignadoId = clienteEncontrado?.inversionista_id || ''
-
-    if (invAsignadoId) {
-      setFormData((prev) => ({
-        ...prev,
-        cliente_id: clienteId,
-        inversionista_id: invAsignadoId
-      }))
-      setInversionistaFijado(true)
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        cliente_id: clienteId,
-        inversionista_id: ''
-      }))
-      setInversionistaFijado(false)
-    }
-  }
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -145,8 +104,8 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
       return
     }
 
-    if (!formData.inversionista_id) {
-      setErrorMsg('Debes seleccionar o tener un inversionista asignado.')
+    if (!(montoCapital > 0)) {
+      setErrorMsg('La opción de préstamo elegida no tiene un capital válido.')
       setLoading(false)
       return
     }
@@ -177,7 +136,7 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
       // Guardar préstamo en la tabla 'prestamos'
       const payload = {
         cliente_id: formData.cliente_id,
-        inversionista_id: formData.inversionista_id,
+        inversionista_id: null,
         creado_por: usuarioId,
         monto_capital: montoCapital,
         monto_total_pagar: montoTotalDevolver,
@@ -198,17 +157,14 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
 
       // Auditoría
       const clienteEncontrado = clientes.find((c) => c.id === formData.cliente_id)
-      const inversionistaEncontrado = inversionistas.find((i) => i.id === formData.inversionista_id)
-
       const nombreCliente = clienteEncontrado?.nombre_completo || 'Cliente'
-      const nombreInversionista = inversionistaEncontrado?.nombre_completo || 'Inversionista'
 
       const auditPayload = {
         tipo: 'PRÉSTAMO',
         accion: 'CREADO',
         titulo: `Préstamo $${montoCapital.toLocaleString('es-AR')}`,
-        subtitulo: `Otorgado a ${nombreCliente} · Fondo: ${nombreInversionista}`,
-        detalles: `${cantidadCuotas} cuotas (${frecuenciaPlan}) de $${Math.round(valorCuota).toLocaleString('es-AR')} · Total: $${Math.round(montoTotalDevolver).toLocaleString('es-AR')}`,
+        subtitulo: `Otorgado a ${nombreCliente}`,
+        detalles: `${cantidadCuotas} cuotas (${frecuenciaPlan}) de $${valorCuota.toLocaleString('es-AR', { minimumFractionDigits: 2 })} · Total: $${montoTotalDevolver.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
         persona: nombreCliente,
         autor_id: usuarioId,
         autor_nombre: autorNombre,
@@ -216,8 +172,7 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
         estado: 'Activo',
         metadata: {
           ...(prestamoCreado || payload),
-          clientes: { nombre_completo: nombreCliente },
-          inversionistas: { nombre_completo: nombreInversionista }
+          clientes: { nombre_completo: nombreCliente }
         }
       }
 
@@ -240,8 +195,8 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs select-none">
-      <div className="w-full max-w-xl rounded-3xl bg-cream p-6 sm:p-8 shadow-2xl border border-line max-h-[92vh] overflow-y-auto">
+    <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs select-none">
+      <div className="modal-panel w-full max-w-xl rounded-3xl bg-cream p-6 sm:p-8 shadow-2xl border border-line max-h-[92vh] overflow-y-auto">
         
         {/* Cabecera */}
         <div className="flex items-start justify-between mb-6">
@@ -322,8 +277,8 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
             </div>
           )}
 
-          {/* Cliente e Inversionista */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Cliente */}
+          <div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Cliente
@@ -332,44 +287,13 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
                 name="cliente_id"
                 required
                 value={formData.cliente_id}
-                onChange={handleClienteChange}
+                onChange={handleChange}
                 className="w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0d6b63]/20 focus:border-[#0d6b63] cursor-pointer"
               >
                 <option value="">-- Seleccioná un cliente --</option>
                 {clientes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nombre_completo}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-bold text-slate-700">
-                  Inversionista
-                </label>
-                {inversionistaFijado && (
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-[#0d6b63]">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Asignado al cliente
-                  </span>
-                )}
-              </div>
-              <select
-                name="inversionista_id"
-                required
-                disabled={inversionistaFijado}
-                value={formData.inversionista_id}
-                onChange={handleChange}
-                className={`w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0d6b63]/20 focus:border-[#0d6b63] cursor-pointer ${
-                  inversionistaFijado ? 'bg-slate-100 opacity-80 cursor-not-allowed' : ''
-                }`}
-              >
-                <option value="">-- Seleccioná un inversionista --</option>
-                {inversionistas.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.nombre_completo}
                   </option>
                 ))}
               </select>
@@ -424,7 +348,7 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
           )}
 
           {/* Botones de acción */}
-          <div className="flex justify-end items-center gap-3 pt-3">
+          <div className="form-acciones flex justify-end items-center gap-3 pt-3">
             <button
               type="button"
               onClick={onClose}

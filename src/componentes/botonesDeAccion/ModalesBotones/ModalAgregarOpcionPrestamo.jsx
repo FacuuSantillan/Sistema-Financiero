@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Plus, Trash2, Edit2, Layers, CreditCard, Search, ArrowLeft } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
 
-export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogueado = null }) {
+export default function ModalCrearPlan({ isOpen, onClose, onSuccess }) {
   // Lista de planes existentes
   const [planes, setPlanes] = useState([])
   const [busqueda, setBusqueda] = useState('')
@@ -19,8 +19,7 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
   // Esquema de cuotas dinámico
   const [opcionesCuotas, setOpcionesCuotas] = useState([
     { cuotas: '1', interes: '0' },
-    { cuotas: '3', interes: '15' },
-    { cuotas: '6', interes: '30' }
+
   ])
 
   const [loadingGuardado, setLoadingGuardado] = useState(false)
@@ -100,14 +99,15 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
     })
     setOpcionesCuotas([
       { cuotas: '1', interes: '0' },
-      { cuotas: '3', interes: '15' },
-      { cuotas: '6', interes: '30' }
+    
     ])
     setErrorMsg('')
   }
 
   // Cargar datos de un plan para editar
   const seleccionarParaEditar = (plan) => {
+    // En celular el formulario queda arriba de la lista: se lleva la vista hasta él
+    document.getElementById('form-plan-prestamo')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     setPlanEnEdicionId(plan.id)
     setFormData({
       nombre: plan.nombre || '',
@@ -167,6 +167,18 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
       .filter((op) => !isNaN(op.cuotas) && op.cuotas > 0)
       .sort((a, b) => a.cuotas - b.cuotas)
 
+    if (!nombreLimpio) {
+      setErrorMsg('El nombre de la opción es obligatorio.')
+      setLoadingGuardado(false)
+      return
+    }
+
+    if (!(montoNum > 0)) {
+      setErrorMsg('El monto del préstamo debe ser mayor a 0.')
+      setLoadingGuardado(false)
+      return
+    }
+
     if (opcionesValidadas.length === 0) {
       setErrorMsg('Debes ingresar al menos una cuota válida.')
       setLoadingGuardado(false)
@@ -194,8 +206,7 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
 
         if (error) throw error
       } else {
-        // CREAR NUEVO
-        payload.creado_por = usuarioLogueado?.id || null
+        // CREAR NUEVO (la tabla planes_prestamo no tiene columna creado_por)
         const { error } = await supabase.from('planes_prestamo').insert([payload])
         if (error) throw error
       }
@@ -219,8 +230,8 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs select-none">
-      <div className="w-full max-w-5xl rounded-3xl bg-cream p-6 sm:p-7 shadow-2xl border border-line h-[90vh] flex flex-col overflow-hidden">
+    <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs select-none">
+      <div className="modal-panel w-full max-w-5xl rounded-3xl bg-cream p-6 sm:p-7 shadow-2xl border border-line modal-panel-full h-[90vh] flex flex-col overflow-hidden">
         
         {/* Cabecera */}
         <div className="flex justify-between items-center pb-4 border-b border-line shrink-0">
@@ -242,10 +253,11 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
         </div>
 
         {/* Contenido en dos columnas */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pt-4 flex-1 overflow-hidden">
-          
+        {/* En celular toda la hoja se desplaza de corrido (formulario primero, lista después) */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pt-4 flex-1 overflow-y-auto md:overflow-hidden">
+
           {/* COLUMNA IZQUIERDA: LISTA DE PLANES EXISTENTES */}
-          <div className="md:col-span-5 flex flex-col h-full border-r border-line pr-0 md:pr-4 overflow-hidden">
+          <div className="order-2 md:order-1 md:col-span-5 flex flex-col md:h-full md:border-r border-t md:border-t-0 pt-4 md:pt-0 border-line pr-0 md:pr-4 md:overflow-hidden">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
                 Planes Activos ({planes.length})
@@ -273,7 +285,7 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
             </div>
 
             {/* Lista scrollable */}
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            <div className="md:flex-1 md:overflow-y-auto space-y-2 pr-1">
               {loadingPlanes ? (
                 <p className="text-xs text-slate-400 text-center py-6">Cargando opciones...</p>
               ) : planesFiltrados.length === 0 ? (
@@ -316,7 +328,7 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
                         <button
                           type="button"
                           onClick={() => seleccionarParaEditar(p)}
-                          className="p-1.5 text-slate-400 hover:text-[#0d6b63] rounded-lg transition-colors cursor-pointer"
+                          className="p-2.5 sm:p-1.5 text-slate-400 hover:text-[#0d6b63] rounded-lg transition-colors cursor-pointer"
                           title="Editar"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -324,7 +336,7 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
                         <button
                           type="button"
                           onClick={(e) => handleBorrarPlan(p.id, e)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                          className="p-2.5 sm:p-1.5 text-slate-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
                           title="Eliminar"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -338,7 +350,7 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
           </div>
 
           {/* COLUMNA DERECHA: FORMULARIO DE CREACIÓN / EDICIÓN */}
-          <div className="md:col-span-7 flex flex-col h-full overflow-hidden">
+          <div id="form-plan-prestamo" className="order-1 md:order-2 md:col-span-7 flex flex-col md:h-full md:overflow-hidden scroll-mt-2">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
                 {planEnEdicionId ? 'Modificar Plan Seleccionado' : 'Crear Nuevo Plan de Cuotas'}
@@ -355,8 +367,8 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess, usuarioLogu
               )}
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-              <div className="space-y-4 overflow-y-auto pr-1 flex-1">
+            <form onSubmit={handleSubmit} className="md:flex-1 flex flex-col md:overflow-hidden">
+              <div className="space-y-4 md:overflow-y-auto pr-1 md:flex-1">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Nombre del Plan / Opción

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { RefreshCw, Users, Briefcase, CreditCard, TrendingUp } from 'lucide-react'
+import { RefreshCw, Users, CreditCard, TrendingUp } from 'lucide-react'
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -12,6 +12,7 @@ import {
   CartesianGrid
 } from 'recharts'
 import { supabase } from '../../lib/supabaseClient'
+import { fechaLocalISO } from '../../lib/finanzas'
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -27,7 +28,6 @@ export default function GraficoEstadistico() {
   const [datosGrafico, setDatosGrafico] = useState([])
   const [totalesPeriodo, setTotalesPeriodo] = useState({
     clientes: 0,
-    inversionistas: 0,
     prestamos: 0,
     interes: 0
   })
@@ -43,23 +43,15 @@ export default function GraficoEstadistico() {
       
       if (errC) console.error('Error clientes:', errC)
 
-      // 2. Cargar Inversionistas (ahora con created_at)
-      const { data: inversionistas, error: errI } = await supabase
-        .from('usuarios')
-        .select('created_at')
-        .eq('rol', 'inversionista')
-      
-      if (errI) console.error('Error inversionistas:', errI)
-
-      // 3. Cargar Préstamos (utiliza fecha_inicio y created_at)
+      // 2. Cargar Préstamos (utiliza fecha_inicio y created_at)
       const { data: prestamos, error: errP } = await supabase
         .from('prestamos')
         .select('created_at, fecha_inicio, monto_capital, monto_total_pagar')
-      
+        .or('estado.is.null,estado.neq.cancelado')
+
       if (errP) console.error('Error préstamos:', errP)
 
       const listaClientes = clientes || []
-      const listaInversionistas = inversionistas || []
       const listaPrestamos = prestamos || []
 
       if (modo === 'anual') {
@@ -67,7 +59,6 @@ export default function GraficoEstadistico() {
           const numMes = index + 1
 
           const cantClientes = listaClientes.filter(c => coincideMes(c.created_at, anioSeleccionado, numMes)).length
-          const cantInversionistas = listaInversionistas.filter(i => coincideMes(i.created_at, anioSeleccionado, numMes)).length
           const prestamosMes = listaPrestamos.filter(p => coincideMes(p.fecha_inicio || p.created_at, anioSeleccionado, numMes))
           
           const interesMes = calcularInteres(prestamosMes)
@@ -75,7 +66,6 @@ export default function GraficoEstadistico() {
           return {
             periodo: nombreMes.substring(0, 3),
             clientes: cantClientes,
-            inversionistas: cantInversionistas,
             prestamos: prestamosMes.length,
             interes: interesMes
           }
@@ -92,7 +82,6 @@ export default function GraficoEstadistico() {
           const dia = i + 1
 
           const cantClientes = listaClientes.filter(c => coincideDia(c.created_at, anioSeleccionado, mesSeleccionado, dia)).length
-          const cantInversionistas = listaInversionistas.filter(inv => coincideDia(inv.created_at, anioSeleccionado, mesSeleccionado, dia)).length
           const prestamosDia = listaPrestamos.filter(p => coincideDia(p.fecha_inicio || p.created_at, anioSeleccionado, mesSeleccionado, dia))
           
           const interesDia = calcularInteres(prestamosDia)
@@ -100,7 +89,6 @@ export default function GraficoEstadistico() {
           return {
             periodo: dia.toString(),
             clientes: cantClientes,
-            inversionistas: cantInversionistas,
             prestamos: prestamosDia.length,
             interes: interesDia
           }
@@ -117,16 +105,18 @@ export default function GraficoEstadistico() {
     }
   }
 
-  // Comparadores directos de texto para evitar errores de huso horario
-  const coincideMes = (fechaStr, anio, mes) => {
-    if (!fechaStr) return false
+  // Comparadores de texto sobre la fecha LOCAL (los timestamps vienen en UTC)
+  const coincideMes = (fechaRaw, anio, mes) => {
+    if (!fechaRaw) return false
+    const fechaStr = fechaLocalISO(fechaRaw)
     const year = parseInt(fechaStr.substring(0, 4), 10)
     const month = parseInt(fechaStr.substring(5, 7), 10)
     return year === Number(anio) && month === Number(mes)
   }
 
-  const coincideDia = (fechaStr, anio, mes, dia) => {
-    if (!fechaStr) return false
+  const coincideDia = (fechaRaw, anio, mes, dia) => {
+    if (!fechaRaw) return false
+    const fechaStr = fechaLocalISO(fechaRaw)
     const year = parseInt(fechaStr.substring(0, 4), 10)
     const month = parseInt(fechaStr.substring(5, 7), 10)
     const day = parseInt(fechaStr.substring(8, 10), 10)
@@ -144,7 +134,6 @@ export default function GraficoEstadistico() {
   const actualizarTotales = (datos) => {
     setTotalesPeriodo({
       clientes: datos.reduce((acc, d) => acc + d.clientes, 0),
-      inversionistas: datos.reduce((acc, d) => acc + d.inversionistas, 0),
       prestamos: datos.reduce((acc, d) => acc + d.prestamos, 0),
       interes: datos.reduce((acc, d) => acc + d.interes, 0)
     })
@@ -252,7 +241,7 @@ export default function GraficoEstadistico() {
       </div>
 
       {/* Tarjetas Superiores */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <div className="p-4 sm:p-5 rounded-3xl bg-white border border-line shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Nuevos Clientes</span>
@@ -263,21 +252,13 @@ export default function GraficoEstadistico() {
 
         <div className="p-4 sm:p-5 rounded-3xl bg-white border border-line shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Inversores creados</span>
-            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600"><Briefcase className="w-4 h-4" /></div>
-          </div>
-          <p className="text-2xl font-bold text-slate-800">{totalesPeriodo.inversionistas}</p>
-        </div>
-
-        <div className="p-4 sm:p-5 rounded-3xl bg-white border border-line shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Préstamos Emitidos</span>
             <div className="p-1.5 rounded-lg bg-[#0d6b63]/10 text-[#0d6b63]"><CreditCard className="w-4 h-4" /></div>
           </div>
           <p className="text-2xl font-bold text-[#0d6b63]">{totalesPeriodo.prestamos}</p>
         </div>
 
-        <div className="p-4 sm:p-5 rounded-3xl bg-white border border-line shadow-xs flex flex-col justify-between">
+        <div className="col-span-2 sm:col-span-1 p-4 sm:p-5 rounded-3xl bg-white border border-line shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rendimiento (Interés)</span>
             <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600"><TrendingUp className="w-4 h-4" /></div>
@@ -289,7 +270,7 @@ export default function GraficoEstadistico() {
       </div>
 
       {/* Gráfico */}
-      <div className="p-4 sm:p-6 rounded-3xl bg-white border border-line shadow-xs h-[450px]">
+      <div className="p-2 sm:p-6 rounded-3xl bg-white border border-line shadow-xs h-[320px] sm:h-[450px]">
         {loading ? (
           <div className="h-full flex items-center justify-center text-sm font-medium text-slate-400">
             Procesando métricas operativas...
@@ -298,7 +279,7 @@ export default function GraficoEstadistico() {
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={datosGrafico}
-              margin={{ top: 20, right: 20, left: 10, bottom: 5 }}
+              margin={{ top: 16, right: 4, left: -12, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" />
               
@@ -334,7 +315,6 @@ export default function GraficoEstadistico() {
               <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '11px', fontWeight: 'bold', color: '#475569' }} />
 
               <Bar yAxisId="left" dataKey="clientes" name="Clientes Nuevos" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={30} />
-              <Bar yAxisId="left" dataKey="inversionistas" name="Inversores" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={30} />
               <Bar yAxisId="left" dataKey="prestamos" name="Préstamos" fill="#0d6b63" radius={[4, 4, 0, 0]} maxBarSize={30} />
               
               <Line 

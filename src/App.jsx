@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { LogOut } from 'lucide-react'
+import { LogOut, Users, CalendarClock, ReceiptText, BadgePercent } from 'lucide-react'
 import { supabase } from './lib/supabaseClient'
 
 // Autenticación
@@ -7,7 +7,6 @@ import Login from './componentes/auth/Login'
 
 // Componentes del Dashboard
 import BarraSuperior from './componentes/barraSuperior/barraSuperior'
-import ModalInversionista from './componentes/botonesDeAccion/ModalesBotones/ModalInversionista'
 import ModalCliente from './componentes/botonesDeAccion/ModalesBotones/ModalClientes'
 import ModalAgregarOpcionPrestamo from './componentes/botonesDeAccion/ModalesBotones/ModalAgregarOpcionPrestamo'
 import ModalAgregarPrestamo from './componentes/botonesDeAccion/ModalesBotones/ModalAgregarPrestamo'
@@ -19,14 +18,16 @@ import PanoramaEstadisticas from './componentes/PanoramaEstadisticas/PanoramaEst
 import ModalAdmin from './componentes/botonesDeAccion/ModalesBotones/ModalAdmin'
 import RegistrosRecientes from './componentes/Registros/RegistrosRecientes'
 import GraficoEstadistico from './componentes/PanoramaEstadisticas/GraficoEstadistico'
+import ModalCobranzas from './componentes/Cobranzas/ModalCobranzas'
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
   const [checkingAuth, setCheckingAuth] = useState(true)
+  const [avisoLogin, setAvisoLogin] = useState('')
 
   const [prestamoFicha, setPrestamoFicha] = useState(null)
   const [modalActivo, setModalActivo] = useState(null)
-  const [tipoDirectorio, setTipoDirectorio] = useState('clientes')
+  const [versionCobros, setVersionCobros] = useState(0)
   const [perfilSeleccionadoId, setPerfilSeleccionadoId] = useState(null)
   const [modalFichaAbierta, setModalFichaAbierta] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -57,30 +58,54 @@ export default function App() {
       return
     }
 
+    // No se deja entrar sin un perfil válido: antes se asignaba el rol
+    // "inversionista" en silencio y el owner/admin no veía sus pantallas.
+    const rechazarIngreso = (mensaje) => {
+      // Diferido: llamar a auth dentro de onAuthStateChange puede bloquear supabase-js
+      setTimeout(() => supabase.auth.signOut(), 0)
+      setUsuario(null)
+      setAvisoLogin(mensaje)
+      redimensionarVentana(false)
+    }
+
     try {
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('usuarios')
         .select('*')
         .eq('id', sessionUser.id)
         .maybeSingle()
 
-      const rolAsignado = profile?.rol || (sessionUser.email?.includes('admin') ? 'admin' : 'inversionista')
-      const nombreAsignado = profile?.nombre_completo || profile?.nombre || sessionUser.email
+      if (error) {
+        console.error('Error al cargar perfil:', error)
+        rechazarIngreso(
+          error.code === '42501'
+            ? 'La base de datos no da permisos de lectura. Ejecutá db/schema.sql en Supabase (sección 2: permisos).'
+            : `No se pudo cargar tu perfil: ${error.message}`
+        )
+        return
+      }
 
+      if (!profile) {
+        rechazarIngreso('Tu usuario no tiene un perfil asignado en el sistema. Pedile al owner que lo cree (sección 5 de db/schema.sql).')
+        return
+      }
+
+      // Un usuario desactivado no puede ingresar al sistema
+      if (profile.activo === false) {
+        rechazarIngreso('Tu cuenta está desactivada. Contactá al administrador.')
+        return
+      }
+
+      setAvisoLogin('')
       setUsuario({
         ...sessionUser,
-        rol: rolAsignado,
-        nombre: nombreAsignado
+        rol: profile.rol || 'admin',
+        nombre: profile.nombre_completo || sessionUser.email
       })
       redimensionarVentana(true)
     } catch (error) {
       console.error('Error al cargar perfil:', error)
-      setUsuario({
-        ...sessionUser,
-        rol: sessionUser.email?.includes('admin') ? 'admin' : 'inversionista',
-        nombre: sessionUser.email
-      })
-      redimensionarVentana(true)
+      rechazarIngreso('No se pudo conectar con el servidor. Revisá tu conexión e intentá de nuevo.')
     }
   }, [redimensionarVentana])
 
@@ -127,13 +152,6 @@ export default function App() {
   }
 
   const handleOpenDirectorioClientes = () => {
-    setTipoDirectorio('clientes')
-    setPerfilSeleccionadoId(null)
-    setModalActivo('directorio')
-  }
-
-  const handleOpenDirectorioInversionistas = () => {
-    setTipoDirectorio('inversionistas')
     setPerfilSeleccionadoId(null)
     setModalActivo('directorio')
   }
@@ -148,20 +166,20 @@ export default function App() {
   }
 
   if (!usuario) {
-    return <Login onLoginSuccess={(u) => cargarPerfilUsuario(u)} />
+    return <Login key={avisoLogin} avisoInicial={avisoLogin} onLoginSuccess={(u) => cargarPerfilUsuario(u)} />
   }
 
   const esAdmin = usuario.rol === 'admin' || usuario.rol === 'owner'
 
   return (
-    <div key={`${usuario.id}-${usuario.rol}-${refreshKey}`} className="min-h-screen bg-paper pb-12 safe-pt safe-px">
+    <div key={`${usuario.id}-${usuario.rol}-${refreshKey}`} className="min-h-screen bg-paper pb-28 sm:pb-12 safe-pt safe-px">
       {/* Barra de usuario y Logout */}
-      <div className="w-[95%] mx-auto pt-3 flex items-center justify-between text-xs font-medium text-slate-600 border-b border-line/60 pb-2 mb-2">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-bold text-slate-800">{usuario.nombre}</span>
+      <div className="w-[95%] mx-auto pt-3 flex items-center justify-between gap-3 text-xs font-medium text-slate-600 border-b border-line/60 pb-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-2.5 h-2.5 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-bold text-slate-800 truncate">{usuario.nombre}</span>
           <span
-            className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+            className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
               esAdmin ? 'bg-[#0d6b63]/10 text-[#0d6b63]' : 'bg-blue-100 text-blue-800'
             }`}
           >
@@ -171,10 +189,11 @@ export default function App() {
 
         <button
           onClick={handleLogout}
-          className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white border border-line text-slate-600 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer font-bold shadow-2xs"
+          aria-label="Cerrar sesión"
+          className="shrink-0 flex items-center justify-center gap-1.5 min-w-[40px] min-h-[40px] sm:min-h-0 px-3 py-1 rounded-xl bg-white border border-line text-slate-600 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer font-bold shadow-2xs"
         >
-          <LogOut className="w-3.5 h-3.5" />
-          <span>Cerrar Sesión</span>
+          <LogOut className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+          <span className="hidden sm:inline">Cerrar Sesión</span>
         </button>
       </div>
 
@@ -184,22 +203,16 @@ export default function App() {
         rolUsuario={usuario?.rol}
         onOpenModal={(tipo) => setModalActivo(tipo)}
         onOpenClientes={handleOpenDirectorioClientes}
-        onOpenInversionistas={handleOpenDirectorioInversionistas}
+        onOpenCobranzas={() => setModalActivo('cobranzas')}
       />
 
       {/* Modales */}
-      <ModalInversionista
-        rolUsuario={usuario?.rol}
-        isOpen={modalActivo === 'inversionista'}
-        onClose={() => setModalActivo(null)}
-        onSuccess={handleRefreshData}
-      />
-
       <ModalAdmin
         rolUsuario={usuario?.rol}
         isOpen={modalActivo === 'admin'}
         onClose={() => setModalActivo(null)}
         onSuccess={handleRefreshData}
+        usuarioLogueado={usuario}
       />
 
       <ModalCliente
@@ -207,6 +220,7 @@ export default function App() {
         isOpen={modalActivo === 'cliente'}
         onClose={() => setModalActivo(null)}
         onSuccess={handleRefreshData}
+        usuarioLogueado={usuario}
       />
 
       <ModalAgregarOpcionPrestamo
@@ -221,6 +235,7 @@ export default function App() {
         isOpen={modalActivo === 'prestamo'}
         onClose={() => setModalActivo(null)}
         onSuccess={handleRefreshData}
+        usuarioLogueado={usuario}
       />
 
       <ModalPago
@@ -231,10 +246,16 @@ export default function App() {
         usuarioLogueado={usuario}
       />
 
+      <ModalCobranzas
+        isOpen={modalActivo === 'cobranzas'}
+        version={versionCobros}
+        onClose={() => setModalActivo(null)}
+        onVerFichaPrestamo={handleAbrirFichaPrestamo}
+      />
+
       <ModalDirectorio
         rolUsuario={usuario?.rol}
         isOpen={modalActivo === 'directorio'}
-        tipoInicial={tipoDirectorio}
         itemInicialId={perfilSeleccionadoId}
         usuarioLogueado={usuario}
         onClose={() => {
@@ -252,15 +273,14 @@ export default function App() {
           setPrestamoFicha(null)
         }}
         prestamo={prestamoFicha}
+        usuarioLogueado={usuario}
+        onCobroRegistrado={() => setVersionCobros((v) => v + 1)}
       />
 
       {/* Métricas y Estadísticas */}
       {esAdmin && (
         <>
-          <PanoramaEstadisticas
-            onAbrirDirectorioInversionistas={handleOpenDirectorioInversionistas}
-            rolUsuario={usuario?.rol}
-          />
+          <PanoramaEstadisticas rolUsuario={usuario?.rol} />
           <GraficoEstadistico />
         </>
       )}
@@ -271,17 +291,44 @@ export default function App() {
           rolUsuario={usuario?.rol}
           onVerFichaPrestamo={handleAbrirFichaPrestamo}
           onAbrirCliente={(cliente) => {
-            setTipoDirectorio('clientes')
             setPerfilSeleccionadoId(cliente?.id || null)
-            setModalActivo('directorio')
-          }}
-          onAbrirInversionista={(inversionista) => {
-            setTipoDirectorio('inversionistas')
-            setPerfilSeleccionadoId(inversionista?.id || null)
             setModalActivo('directorio')
           }}
         />
       )}
+
+      {/* Barra inferior de accesos rápidos (solo celular) */}
+      <nav
+        aria-label="Accesos rápidos"
+        className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-line shadow-[0_-4px_16px_rgba(0,0,0,0.06)] safe-pb safe-px"
+      >
+        <div className="grid grid-flow-col auto-cols-fr">
+          {[
+            { id: 'directorio', label: 'Clientes', icon: Users, onClick: handleOpenDirectorioClientes, visible: true },
+            { id: 'cobranzas', label: 'Cuotas', icon: CalendarClock, onClick: () => setModalActivo('cobranzas'), visible: esAdmin },
+            { id: 'pago', label: 'Cobrar', icon: ReceiptText, onClick: () => setModalActivo('pago'), visible: true },
+            { id: 'prestamo', label: 'Préstamo', icon: BadgePercent, onClick: () => setModalActivo('prestamo'), visible: esAdmin }
+          ]
+            .filter((b) => b.visible)
+            .map((b) => {
+              const Icono = b.icon
+              const activo = modalActivo === b.id
+              return (
+                <button
+                  key={b.id}
+                  onClick={b.onClick}
+                  aria-current={activo ? 'page' : undefined}
+                  className={`flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-bold cursor-pointer ${
+                    activo ? 'text-[#0d6b63]' : 'text-slate-500 active:text-[#0d6b63]'
+                  }`}
+                >
+                  <Icono className="w-6 h-6" />
+                  {b.label}
+                </button>
+              )
+            })}
+        </div>
+      </nav>
     </div>
   )
 }

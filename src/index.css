@@ -15,3 +15,92 @@
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
 }
+
+/* ==========================================================
+   EXPERIENCIA TÁCTIL (celular / tablet)
+   ========================================================== */
+
+/* Sin el destello gris al tocar y sin la demora de doble toque */
+button, a, label, select, summary, [role='button'] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Mientras hay un modal abierto, la página de fondo no se desplaza */
+body:has(.modal-overlay) {
+  overflow: hidden;
+}
+
+.modal-panel {
+  overscroll-behavior: contain;
+}
+
+/* ----- Solo en pantallas de celular (< 640px) ----- */
+@media (max-width: 639px) {
+  /* 16px evita que iOS agrande la pantalla al tocar un campo y se lee mejor */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Los modales se abren como "hoja" desde abajo, ocupando todo el ancho */
+  .modal-overlay {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+
+  .modal-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 8px) !important;
+    border-radius: 1.5rem 1.5rem 0 0 !important;
+    border-bottom: 0 !important;
+    padding: 1.25rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+    animation: hoja-sube 0.22s ease-out;
+  }
+
+  /* Modales de pantalla completa (listados, fichas) */
+  .modal-panel-full {
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - 8px) !important;
+  }
+
+  /* Botones Guardar/Cancelar fijos al pie de la hoja, siempre visibles */
+  .modal-panel:not(.modal-panel-full) {
+    overflow-y: auto !important;
+  }
+
+  .modal-panel:has(.form-acciones) {
+    padding-bottom: 0 !important;
+  }
+
+  .modal-panel .form-acciones {
+    position: sticky;
+    bottom: 0;
+    margin: 0 -1rem;
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
+    background: #fffdf8;
+    border-top: 1px solid #d8d1c4;
+    z-index: 5;
+  }
+
+  .modal-panel .form-acciones > button {
+    flex: 1 1 0;
+    min-height: 48px;
+  }
+
+  /* Botones de solo ícono: área táctil mínima de 40px */
+  .modal-panel button:has(> svg:only-child) {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+@keyframes hoja-sube {
+  from { transform: translateY(32px); }
+  to { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-panel { animation: none !important; }
+}

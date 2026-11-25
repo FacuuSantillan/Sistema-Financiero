@@ -1,58 +1,51 @@
 import React from "react";
-import { 
-  Users, 
-  Briefcase, 
-  ShieldPlus, 
-  UserPlus, 
-  HandCoins, 
-  ReceiptText, 
-  BadgePercent 
+import {
+  Users,
+  ShieldPlus,
+  HandCoins,
+  ReceiptText,
+  BadgePercent,
+  CalendarClock
 } from "lucide-react";
+import FiltroProvincia from "../barraSuperior/filtroPorProvincia";
 
-import filtroProvincia from "../barraSuperior/filtroPorProvincia";
 
-export default function BotonesDeAccion({ 
-  onOpenModal, 
-  onOpenClientes, 
-  onOpenInversionistas, 
-  provinciaSeleccionada, 
-  setProvinciaSeleccionada, 
+export default function BotonesDeAccion({
+  onOpenModal,
+  onOpenClientes,
+  onOpenCobranzas,
+  provinciaSeleccionada,
+  setProvinciaSeleccionada,
   provincias = [],
-  rolUsuario = "admin" 
+  rolUsuario = "admin"
 }) {
 
   const VISTAS = [
-    { 
+    {
       id: "clientes",
-      label: "Ver Clientes", 
-      icon: Users, 
-      onClick: onOpenClientes, 
-      roles: ["owner", "admin", "inversionista"] 
+      label: "Ver Clientes",
+      icon: Users,
+      onClick: onOpenClientes,
+      roles: ["owner", "admin", "inversionista"]
     },
-    { 
-      id: "inversionistas",
-      label: "Ver Inversionistas", 
-      icon: Briefcase, 
-      onClick: onOpenInversionistas, 
-      roles: ["owner", "admin"] 
+    {
+      id: "cobranzas",
+      label: "Cuotas y vencimientos",
+      icon: CalendarClock,
+      onClick: onOpenCobranzas,
+      roles: ["owner", "admin"]
     },
   ];
 
   // 2. CONFIGURACIÓN DE ALTAS Y MODALES
   const ACCIONES = [
-    { 
-      id: "admin", 
-      label: "Agregar admin", 
-      icon: ShieldPlus, 
-      roles: ["owner"] 
+    {
+      id: "admin",
+      label: "Agregar admin",
+      icon: ShieldPlus,
+      roles: ["owner"]
     },
-    { 
-      id: "inversionista", 
-      label: "Agregar inversor", 
-      icon: UserPlus, 
-      roles: ["owner", "admin"] 
-    },
-    { 
+    {
       id: "cliente", 
       label: "Agregar cliente", 
       icon: Users, 
@@ -79,7 +72,7 @@ export default function BotonesDeAccion({
   ];
 
   return (
-    <div className="mt-5 w-full space-y-4 select-none">
+    <div className="mt-5 w-full px-4 sm:px-0 space-y-3 sm:space-y-4 select-none">
       
       {provincias.length > 0 && (
         <div className="flex justify-center mb-2">
@@ -92,7 +85,8 @@ export default function BotonesDeAccion({
       )}
 
       {/* SECCIÓN 1: VISTAS Y NAVEGACIÓN */}
-      <div className="flex flex-wrap justify-center items-center gap-2.5">
+      {/* En celular: grilla de 2 columnas con botones grandes. En PC: fila centrada. */}
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:items-center sm:gap-2.5">
         {VISTAS
           .filter((btn) => btn.roles.includes(rolUsuario))
           .map((btn) => {
@@ -101,17 +95,17 @@ export default function BotonesDeAccion({
               <button
                 key={btn.id}
                 onClick={btn.onClick}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#0d6b63] border border-[#0d6b63]/20 text-[#fcfcfc] font-bold text-xs hover:bg-[#0b5a52] transition-all shadow-xs cursor-pointer"
+                className="flex items-center justify-center gap-2 px-3 sm:px-4 py-3.5 sm:py-2.5 rounded-2xl bg-[#0d6b63] border border-[#0d6b63]/20 text-[#fcfcfc] font-bold text-sm sm:text-xs hover:bg-[#0b5a52] active:scale-[0.98] transition-all shadow-xs cursor-pointer"
               >
-                <Icon className="w-4 h-4 text-[#f9f9f9]" />
-                <span>{btn.label}</span>
+                <Icon className="w-5 h-5 sm:w-4 sm:h-4 shrink-0 text-[#f9f9f9]" />
+                <span className="leading-tight">{btn.label}</span>
               </button>
             );
           })}
       </div>
 
       {/* SECCIÓN 2: ALTAS Y MODALES */}
-      <div className="flex flex-wrap items-center justify-center gap-2.5">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-2.5">
         {ACCIONES
           .filter((btn) => btn.roles.includes(rolUsuario))
           .map((btn) => {
@@ -120,10 +114,10 @@ export default function BotonesDeAccion({
               <button
                 key={btn.id}
                 onClick={() => onOpenModal && onOpenModal(btn.id)}
-                className="flex items-center border border-[#0d6b63]/20 gap-2 bg-[#0d6b63]/10 text-[#0d6b63] px-3.5 py-2.5 rounded-xl shadow-xs hover:bg-[#0d6b63]/20 transition-colors duration-200 font-medium text-xs sm:text-sm cursor-pointer"
+                className="flex flex-col sm:flex-row items-center justify-center text-center gap-1.5 sm:gap-2 border border-[#0d6b63]/20 bg-white sm:bg-[#0d6b63]/10 text-[#0d6b63] px-2 sm:px-3.5 py-3 sm:py-2.5 min-h-[72px] sm:min-h-0 rounded-2xl sm:rounded-xl shadow-xs hover:bg-[#0d6b63]/20 active:scale-[0.98] transition-all duration-200 font-semibold sm:font-medium text-xs sm:text-sm cursor-pointer"
               >
-                <Icon className="w-4 h-4" />
-                <span>{btn.label}</span>
+                <Icon className="w-5 h-5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="leading-tight">{btn.label}</span>
               </button>
             );
           })}
