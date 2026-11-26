@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
+import { avisar } from '../../lib/avisos'
 import { subirDocumentos } from '../../lib/documentos'
 import CamposPersona, { payloadPersona, personaVacia, personaDesdeRegistro } from './CamposPersona'
 import SelectorFotos from './SelectorFotos'
@@ -71,6 +72,7 @@ export default function ModalGarante({ isOpen, onClose, onGuardado, cliente, gar
       }])
       if (errAudit) console.warn('Aviso al registrar auditoría de garante:', errAudit.message)
 
+      avisar(garante?.id ? 'Garante actualizado' : `Garante ${datos.nombre_completo} guardado`)
       onGuardado?.(guardado)
       onClose()
     } catch (err) {

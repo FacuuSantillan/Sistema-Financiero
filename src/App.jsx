@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { LogOut, Users, CalendarClock, ReceiptText, BadgePercent } from 'lucide-react'
 import { supabase } from './lib/supabaseClient'
 
@@ -16,9 +16,17 @@ import BotonesDeAccion from './componentes/botonesDeAccion/BotonesDeAccion'
 import ModalFichaPrestamo from './componentes/botonesDeAccion/ModalesBotones/ModalFichaPrestamo'
 import PanoramaEstadisticas from './componentes/PanoramaEstadisticas/PanoramaEstadisticas'
 import ModalAdmin from './componentes/botonesDeAccion/ModalesBotones/ModalAdmin'
-import RegistrosRecientes from './componentes/Registros/RegistrosRecientes'
-import GraficoEstadistico from './componentes/PanoramaEstadisticas/GraficoEstadistico'
 import ModalCobranzas from './componentes/Cobranzas/ModalCobranzas'
+import Avisos from './componentes/comunes/Avisos'
+
+// Carga diferida: el gráfico (recharts) y el registro de actividades son pesados
+// y solo los ven admin/owner. Se descargan recién cuando hacen falta.
+const GraficoEstadistico = lazy(() => import('./componentes/PanoramaEstadisticas/GraficoEstadistico'))
+const RegistrosRecientes = lazy(() => import('./componentes/Registros/RegistrosRecientes'))
+
+const CargandoSeccion = () => (
+  <div className="w-[95%] mx-auto my-6 h-40 rounded-3xl bg-white/60 border border-line animate-pulse" />
+)
 
 export default function App() {
   const [usuario, setUsuario] = useState(null)
@@ -172,6 +180,9 @@ export default function App() {
   const esAdmin = usuario.rol === 'admin' || usuario.rol === 'owner'
 
   return (
+    <>
+    {/* Fuera del bloque que se re-monta al refrescar datos, para que los avisos no se pierdan */}
+    <Avisos />
     <div key={`${usuario.id}-${usuario.rol}-${refreshKey}`} className="min-h-screen bg-paper pb-28 sm:pb-12 safe-pt safe-px">
       {/* Barra de usuario y Logout */}
       <div className="w-[95%] mx-auto pt-3 flex items-center justify-between gap-3 text-xs font-medium text-slate-600 border-b border-line/60 pb-2 mb-2">
@@ -275,26 +286,35 @@ export default function App() {
         prestamo={prestamoFicha}
         usuarioLogueado={usuario}
         onCobroRegistrado={() => setVersionCobros((v) => v + 1)}
+        onPrestamoEliminado={() => {
+          setVersionCobros((v) => v + 1)
+          // Refresca listados (ficha del cliente, estadísticas) sin el préstamo borrado
+          handleRefreshData()
+        }}
       />
 
       {/* Métricas y Estadísticas */}
       {esAdmin && (
         <>
           <PanoramaEstadisticas rolUsuario={usuario?.rol} />
-          <GraficoEstadistico />
+          <Suspense fallback={<CargandoSeccion />}>
+            <GraficoEstadistico />
+          </Suspense>
         </>
       )}
 
       {/* Registros Recientes */}
       {usuario?.rol === 'owner' && (
-        <RegistrosRecientes
-          rolUsuario={usuario?.rol}
-          onVerFichaPrestamo={handleAbrirFichaPrestamo}
-          onAbrirCliente={(cliente) => {
-            setPerfilSeleccionadoId(cliente?.id || null)
-            setModalActivo('directorio')
-          }}
-        />
+        <Suspense fallback={<CargandoSeccion />}>
+          <RegistrosRecientes
+            rolUsuario={usuario?.rol}
+            onVerFichaPrestamo={handleAbrirFichaPrestamo}
+            onAbrirCliente={(cliente) => {
+              setPerfilSeleccionadoId(cliente?.id || null)
+              setModalActivo('directorio')
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Barra inferior de accesos rápidos (solo celular) */}
@@ -330,5 +350,6 @@ export default function App() {
         </div>
       </nav>
     </div>
+    </>
   )
 }

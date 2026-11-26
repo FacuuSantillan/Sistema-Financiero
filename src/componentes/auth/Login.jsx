@@ -3,6 +3,17 @@ import { Lock, Mail, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowRight } from 'l
 import { supabase } from '../../lib/supabaseClient'
 import backgroundImage from '../../assets/background.jpg'
 
+// Supabase devuelve los errores en inglés: se traducen los más comunes
+function traducirErrorLogin(err) {
+  const msg = (err?.message || '').toLowerCase()
+  if (msg.includes('invalid login credentials')) return 'Correo o contraseña incorrectos.'
+  if (msg.includes('email not confirmed')) return 'Tu correo todavía no está confirmado. Pedile al administrador que lo confirme.'
+  if (msg.includes('too many requests') || err?.status === 429) return 'Demasiados intentos. Esperá unos minutos y volvé a probar.'
+  if (msg.includes('failed to fetch') || msg.includes('network')) return 'No hay conexión con el servidor. Revisá tu internet.'
+  if (msg.includes('user not found')) return 'No existe un usuario con ese correo.'
+  return err?.message || 'No se pudo iniciar sesión. Verificá tu correo y contraseña.'
+}
+
 export default function Login({ onLoginSuccess, avisoInicial = '' }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,7 +40,7 @@ export default function Login({ onLoginSuccess, avisoInicial = '' }) {
       }
     } catch (err) {
       console.error('Error de autenticación:', err)
-      setErrorMsg(err.message || 'Credenciales inválidas. Verificá tu correo y contraseña.')
+      setErrorMsg(traducirErrorLogin(err))
     } finally {
       setLoading(false)
     }

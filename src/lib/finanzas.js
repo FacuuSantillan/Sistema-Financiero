@@ -152,21 +152,103 @@ export function punitorioTotal(cuotasVencidas, tasaPorcentaje, cadaDias) {
   )
 }
 
-/** Configuración de punitorio recordada en este equipo (solo como valor por defecto). */
-const CLAVE_CONFIG_PUNITORIO = 'valora.punitorio'
-export function leerConfigPunitorio() {
-  try {
-    const guardado = JSON.parse(localStorage.getItem(CLAVE_CONFIG_PUNITORIO) || 'null')
-    if (guardado && guardado.tasa >= 0 && guardado.cadaDias >= 1) return guardado
-  } catch {
-    // sin almacenamiento disponible: se usan los valores por defecto
+// ----------------------------------------------------------
+// PUNITORIO OBLIGATORIO
+// Se aplica a todos los préstamos con la configuración general, salvo que
+// el préstamo esté exento o tenga una configuración propia.
+// ----------------------------------------------------------
+
+/** Valores usados si todavía no existe la tabla `configuracion`. */
+export const PUNITORIO_GENERAL_POR_DEFECTO = { tasa: 0.5, cadaDias: 1 }
+
+const enteroMin1 = (v) => Math.max(1, Math.floor(Number(v) || 1))
+const tasaValida = (v) => Math.max(0, Number(v) || 0)
+
+/** Normaliza la fila de `configuracion` a { tasa, cadaDias }. */
+export function normalizarPunitorioGeneral(fila) {
+  if (!fila) return { ...PUNITORIO_GENERAL_POR_DEFECTO }
+  return {
+    tasa: tasaValida(fila.punitorio_tasa ?? PUNITORIO_GENERAL_POR_DEFECTO.tasa),
+    cadaDias: enteroMin1(fila.punitorio_cada_dias ?? PUNITORIO_GENERAL_POR_DEFECTO.cadaDias)
   }
-  return { tasa: 0.5, cadaDias: 1 }
 }
-export function guardarConfigPunitorio(config) {
-  try {
-    localStorage.setItem(CLAVE_CONFIG_PUNITORIO, JSON.stringify(config))
-  } catch {
-    // ignorar
+
+/**
+ * Configuración que efectivamente se aplica a un préstamo.
+ * @returns {{ aplica: boolean, tasa: number, cadaDias: number, personalizada: boolean }}
+ */
+export function configPunitorioPrestamo(prestamo, general = PUNITORIO_GENERAL_POR_DEFECTO) {
+  const aplica = prestamo?.punitorio_aplica !== false
+  const tieneTasa = prestamo?.punitorio_tasa !== null && prestamo?.punitorio_tasa !== undefined
+  const tieneDias = prestamo?.punitorio_cada_dias !== null && prestamo?.punitorio_cada_dias !== undefined
+  return {
+    aplica,
+    tasa: tieneTasa ? tasaValida(prestamo.punitorio_tasa) : tasaValida(general.tasa),
+    cadaDias: tieneDias ? enteroMin1(prestamo.punitorio_cada_dias) : enteroMin1(general.cadaDias),
+    personalizada: tieneTasa || tieneDias
+  }
+}
+
+/**
+ * Períodos de mora ya cobrados por cada cuota, a partir de los pagos.
+ * @returns {Object<number, number>}  { numeroCuota: periodosCobrados }
+ */
+export function periodosCobradosPorCuota(pagos = []) {
+  const mapa = {}
+  for (const pago of pagos || []) {
+    const detalle = pago?.punitorio_detalle
+    if (!detalle || !Array.isArray(detalle.cuotas)) continue
+    for (const c of detalle.cuotas) {
+      const numero = Number(c.numero)
+      if (!numero) continue
+      // Registros viejos sin "periodos": se deducen de los días de atraso
+      const periodos = c.periodos !== undefined
+        ? Number(c.periodos) || 0
+        : Math.floor((Number(c.dias_atraso) || 0) / enteroMin1(detalle.cada_dias))
+      mapa[numero] = Math.max(mapa[numero] || 0, periodos)
+    }
+  }
+  return mapa
+}
+
+/**
+ * Punitorio pendiente de cobro de las cuotas vencidas.
+ * Solo cobra los períodos de mora que todavía no se cobraron, sobre el saldo
+ * actual de cada cuota. Ej: 1% diario, cuota de $10.000:
+ *   - día 12: cobra 12 períodos → $1.200 (y la cuota queda con saldo $5.000)
+ *   - día 20: cobra los 8 períodos nuevos sobre $5.000 → $400
+ * @returns {{ total: number, cuotas: Array }} cuotas con { numeroCuota, restante,
+ *   diasAtraso, periodosTotales, periodosNuevos, monto }
+ */
+export function punitorioPendiente(cuotasVencidas, config, periodosCobrados = {}) {
+  if (!config?.aplica) return { total: 0, cuotas: [] }
+  const tasa = tasaValida(config.tasa)
+  const cadaDias = enteroMin1(config.cadaDias)
+
+  const cuotas = (cuotasVencidas || []).map((c) => {
+    const periodosTotales = Math.floor(Math.max(0, Number(c.diasAtraso) || 0) / cadaDias)
+    const periodosNuevos = Math.max(0, periodosTotales - (periodosCobrados[c.numeroCuota] || 0))
+    const monto = redondear2(Math.max(0, Number(c.restante) || 0) * (tasa / 100) * periodosNuevos)
+    return { numeroCuota: c.numeroCuota, restante: c.restante, diasAtraso: c.diasAtraso, periodosTotales, periodosNuevos, monto }
+  })
+
+  return { total: redondear2(cuotas.reduce((acc, c) => acc + c.monto, 0)), cuotas }
+}
+
+/** Arma el detalle que se guarda en pagos.punitorio_detalle. */
+export function detallePunitorioParaGuardar(config, pendiente) {
+  return {
+    tasa: tasaValida(config.tasa),
+    cada_dias: enteroMin1(config.cadaDias),
+    personalizada: Boolean(config.personalizada),
+    cuotas: pendiente.cuotas
+      .filter((c) => c.periodosTotales > 0)
+      .map((c) => ({
+        numero: c.numeroCuota,
+        dias_atraso: c.diasAtraso,
+        periodos: c.periodosTotales, // total ya cubierto de esa cuota tras este cobro
+        saldo: c.restante,
+        monto: c.monto
+      }))
   }
 }

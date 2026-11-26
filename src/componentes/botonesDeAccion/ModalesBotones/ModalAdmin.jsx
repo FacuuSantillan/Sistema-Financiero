@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { X, Lock, Mail, ShieldCheck, User } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../../../lib/supabaseClient'
+import { avisar } from '../../../lib/avisos'
 
 export default function ModalAdmin({ isOpen, onClose, onSuccess, usuarioLogueado = null }) {
   const [loading, setLoading] = useState(false)
@@ -150,6 +151,7 @@ export default function ModalAdmin({ isOpen, onClose, onSuccess, usuarioLogueado
         password: ''
       })
 
+      avisar(`Administrador ${nombreLimpio} creado`)
       if (onSuccess) onSuccess()
       onClose()
 

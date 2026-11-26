@@ -3,22 +3,25 @@ import { X, Receipt, AlertCircle } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
 import {
   hoyLocalISO, fechaFormularioATimestamp, cronogramaConVencimientos, redondear2, TOLERANCIA_SALDO,
-  punitorioTotal, leerConfigPunitorio, guardarConfigPunitorio
+  configPunitorioPrestamo, periodosCobradosPorCuota, punitorioPendiente, detallePunitorioParaGuardar
 } from '../../../lib/finanzas'
+import { usePunitorioGeneral } from '../../../lib/usePunitorioGeneral'
 import CalculadoraPunitorio from '../../comunes/CalculadoraPunitorio'
+import { avisar } from '../../../lib/avisos'
+import { abrirWhatsApp, mensajeComprobante, normalizarTelefonoAR } from '../../../lib/whatsapp'
 
 export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado = null }) {
   const [clientes, setClientes] = useState([])
   const [prestamosCliente, setPrestamosCliente] = useState([])
-  
+
   const [loading, setLoading] = useState(false)
   const [fetchingPrestamos, setFetchingPrestamos] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+
+  // Punitorio obligatorio: configuración del préstamo elegido (o la general)
+  const { config: punitorioGeneral } = usePunitorioGeneral(isOpen)
   const [cuotasVencidas, setCuotasVencidas] = useState([])
-  const [configPunitorio, setConfigPunitorio] = useState(() => ({ aplicar: false, ...leerConfigPunitorio() }))
-  const punitorioCobro = configPunitorio.aplicar
-    ? punitorioTotal(cuotasVencidas, configPunitorio.tasa, configPunitorio.cadaDias)
-    : 0
+  const [pagosPrestamo, setPagosPrestamo] = useState([])
 
   const [formData, setFormData] = useState({
     cliente_id: '',
@@ -28,6 +31,11 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
     fecha_pago: hoyLocalISO(),
     observaciones: ''
   })
+
+  const prestamoElegido = prestamosCliente.find((p) => p.id === formData.prestamo_id) || null
+  const configPunitorio = configPunitorioPrestamo(prestamoElegido, punitorioGeneral)
+  const pendientePunitorio = punitorioPendiente(cuotasVencidas, configPunitorio, periodosCobradosPorCuota(pagosPrestamo))
+  const punitorioCobro = pendientePunitorio.total
 
   const [detalleCobro, setDetalleCobro] = useState({
     montoTotalPagar: 0,
@@ -85,7 +93,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
 
         const { data: dataClientes, error: errC } = await supabase
           .from('clientes')
-          .select('id, nombre_completo')
+          .select('id, nombre_completo, telefono')
           .in('id', clienteIdsActivos)
           .order('nombre_completo', { ascending: true })
 
@@ -108,7 +116,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
 
         const { data: dataClientes, error: errC } = await supabase
           .from('clientes')
-          .select('id, nombre_completo')
+          .select('id, nombre_completo, telefono')
           .in('id', clienteIdsActivos)
           .order('nombre_completo', { ascending: true })
 
@@ -174,12 +182,14 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
 
     async function calcularSaldos() {
       try {
+        // select('*') incluye punitorio_detalle: evita cobrar dos veces la misma mora
         const { data: pagos, error } = await supabase
           .from('pagos')
-          .select('monto_cobrado')
+          .select('*')
           .eq('prestamo_id', prestamo.id)
 
         if (error) throw error
+        setPagosPrestamo(pagos || [])
 
         const totalPagado = pagos ? pagos.reduce((acc, curr) => acc + Number(curr.monto_cobrado || 0), 0) : 0
         
@@ -222,7 +232,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
 
   const resetDetalleCobro = () => {
     setCuotasVencidas([])
-    setConfigPunitorio((c) => ({ ...c, aplicar: false }))
+    setPagosPrestamo([])
     setDetalleCobro({
       montoTotalPagar: 0,
       montoCuota: 0,
@@ -314,12 +324,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
       // El punitorio se guarda aparte: no descuenta saldo de las cuotas
       if (punitorioCobro > 0) {
         payload.punitorio = punitorioCobro
-        payload.punitorio_detalle = {
-          tasa: Number(configPunitorio.tasa),
-          cada_dias: Math.max(1, Math.floor(Number(configPunitorio.cadaDias) || 1)),
-          cuotas: cuotasVencidas.map((c) => ({ numero: c.numeroCuota, dias_atraso: c.diasAtraso, saldo: c.restante }))
-        }
-        guardarConfigPunitorio({ tasa: Number(configPunitorio.tasa), cadaDias: Math.max(1, Math.floor(Number(configPunitorio.cadaDias) || 1)) })
+        payload.punitorio_detalle = detallePunitorioParaGuardar(configPunitorio, pendientePunitorio)
       }
 
       const { data: pagoCreado, error: errorPago } = await supabase
@@ -377,6 +382,25 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
 
         if (errorPrestamo) throw errorPrestamo
       }
+
+      // Aviso con opción de mandar el comprobante por WhatsApp
+      const datosComprobante = {
+        nombre: nombreCliente,
+        monto,
+        punitorio: punitorioCobro,
+        metodo: formData.metodo_pago,
+        fecha: new Date(`${formData.fecha_pago}T12:00:00`),
+        saldoRestante: Math.max(0, totalAcumuladoDB < montoTotalPagar ? montoTotalPagar - totalAcumuladoDB : 0),
+        prestamoId: formData.prestamo_id
+      }
+      const telefono = clienteActual?.telefono
+      avisar(
+        `Cobro de $${(monto + punitorioCobro).toLocaleString('es-AR', { minimumFractionDigits: 2 })} registrado`,
+        'exito',
+        normalizarTelefonoAR(telefono)
+          ? { accion: { texto: 'Enviar comprobante', onClick: () => abrirWhatsApp(telefono, mensajeComprobante(datosComprobante)) } }
+          : {}
+      )
 
       if (onSuccess) onSuccess()
       onClose()
@@ -579,7 +603,7 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
             </div>
           </div>
 
-          <CalculadoraPunitorio cuotasVencidas={cuotasVencidas} config={configPunitorio} setConfig={setConfigPunitorio} />
+          <CalculadoraPunitorio vencidas={cuotasVencidas} config={configPunitorio} pendiente={pendientePunitorio} />
 
           {punitorioCobro > 0 && (
             <div className="flex justify-between items-center p-3 rounded-xl bg-slate-900 text-white text-sm font-bold">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Search, CreditCard, Eye, Power, Edit2, Trash2, AlertTriangle, X, ShieldCheck, FileImage, Plus } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
+import { avisar } from '../../../lib/avisos'
 import GaleriaDocumentos from '../../comunes/GaleriaDocumentos'
 import ModalGarante from '../../comunes/ModalGarante'
 
@@ -125,6 +126,7 @@ export default function FichaCliente({
       }
 
       setModalConfirmacion(false)
+      avisar(`Cliente ${cliente.nombre_completo} eliminado`)
       if (onSuccess) onSuccess(cliente.id)
     } catch (err) {
       console.error('Error al borrar cliente:', err)

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X, Search, AlertTriangle, Eye, RefreshCw, CalendarClock, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
+import { avisar } from '../../lib/avisos'
 import {
-  cronogramaConVencimientos, TOLERANCIA_SALDO, punitorioTotal,
-  leerConfigPunitorio, guardarConfigPunitorio
+  cronogramaConVencimientos, TOLERANCIA_SALDO, configPunitorioPrestamo,
+  periodosCobradosPorCuota, punitorioPendiente
 } from '../../lib/finanzas'
+import { usePunitorioGeneral } from '../../lib/usePunitorioGeneral'
 import BotonWhatsApp from '../comunes/BotonWhatsApp'
-import { CampoDias } from '../comunes/CalculadoraPunitorio'
+import { CampoDias, describirPunitorio } from '../comunes/CalculadoraPunitorio'
 
 const fmt = (n) => Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtFecha = (d) => d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -26,7 +28,13 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
   const [error, setError] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [filtro, setFiltro] = useState('todos')
-  const [punitorio, setPunitorio] = useState(() => ({ aplicar: false, ...leerConfigPunitorio() }))
+
+  // Configuración general de punitorio (compartida, guardada en la base)
+  const { config: general, error: errorGeneral, guardar: guardarGeneral } = usePunitorioGeneral(isOpen)
+  const [editandoGeneral, setEditandoGeneral] = useState(false)
+  const [formGeneral, setFormGeneral] = useState({ tasa: '', cadaDias: '' })
+  const [guardandoGeneral, setGuardandoGeneral] = useState(false)
+  const [errorGuardado, setErrorGuardado] = useState('')
 
   const cargar = async () => {
     setLoading(true)
@@ -43,14 +51,17 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
 
       let pagos = []
       if (ids.length > 0) {
-        const { data, error: errPagos } = await supabase.from('pagos').select('prestamo_id, monto_cobrado').in('prestamo_id', ids)
+        // select('*') trae punitorio_detalle: la mora ya cobrada no se vuelve a sumar
+        const { data, error: errPagos } = await supabase.from('pagos').select('*').in('prestamo_id', ids)
         if (errPagos) throw errPagos
         pagos = data || []
       }
 
       const cobradoPorPrestamo = {}
+      const pagosPorPrestamo = {}
       pagos.forEach((p) => {
         cobradoPorPrestamo[p.prestamo_id] = (cobradoPorPrestamo[p.prestamo_id] || 0) + Number(p.monto_cobrado || 0)
+        ;(pagosPorPrestamo[p.prestamo_id] ||= []).push(p)
       })
 
       const resultado = lista
@@ -66,7 +77,8 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
             cantidadCuotas: cuotas.length,
             vencidas,
             deudaVencida: vencidas.reduce((acc, c) => acc + c.restante, 0),
-            saldoPendiente
+            saldoPendiente,
+            periodosCobrados: periodosCobradosPorCuota(pagosPorPrestamo[prestamo.id])
           }
         })
         .filter(Boolean)
@@ -106,15 +118,34 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
     })
   }, [filas, busqueda, filtro])
 
+  // Punitorio obligatorio de cada préstamo (según su configuración o la general)
+  const punitorioDe = (f) => {
+    const config = configPunitorioPrestamo(f.prestamo, general)
+    return { config, monto: punitorioPendiente(f.vencidas, config, f.periodosCobrados).total }
+  }
+
   const totalVencidas = filas.filter((f) => f.vencidas.length > 0).length
   const montoVencido = filas.reduce((acc, f) => acc + f.deudaVencida, 0)
+  const punitorioTotalCartera = filas.reduce((acc, f) => acc + punitorioDe(f).monto, 0)
 
-  const actualizarPunitorio = (cambio) => {
-    setPunitorio((prev) => {
-      const nuevo = { ...prev, ...cambio }
-      guardarConfigPunitorio({ tasa: Number(nuevo.tasa) || 0, cadaDias: Math.max(1, Math.floor(Number(nuevo.cadaDias) || 1)) })
-      return nuevo
-    })
+  const abrirEdicionGeneral = () => {
+    setFormGeneral({ tasa: String(general.tasa), cadaDias: String(general.cadaDias) })
+    setErrorGuardado('')
+    setEditandoGeneral(true)
+  }
+
+  const guardarConfigGeneral = async () => {
+    setGuardandoGeneral(true)
+    setErrorGuardado('')
+    try {
+      await guardarGeneral(formGeneral)
+      avisar('Punitorio general actualizado: se aplica a todos los préstamos sin configuración propia')
+      setEditandoGeneral(false)
+    } catch (err) {
+      setErrorGuardado(err.message || 'No se pudo guardar.')
+    } finally {
+      setGuardandoGeneral(false)
+    }
   }
 
   if (!isOpen) return null
@@ -132,6 +163,9 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
               <span className={totalVencidas > 0 ? 'text-red-700 font-bold' : ''}>
                 {totalVencidas} con cuotas vencidas (${fmt(montoVencido)})
               </span>
+              {punitorioTotalCartera > 0 && (
+                <span className="text-red-700 font-bold"> · Punitorios: ${fmt(punitorioTotalCartera)}</span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -164,26 +198,44 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap items-center gap-2 bg-white/80 px-3 py-1.5 rounded-2xl border border-line text-xs font-bold text-slate-700">
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" checked={punitorio.aplicar} onChange={(e) => actualizarPunitorio({ aplicar: e.target.checked })} className="w-4 h-4 accent-red-600 cursor-pointer" />
-              Punitorio
-            </label>
-            {punitorio.aplicar && (
+          {/* Punitorio general (obligatorio para todos los préstamos salvo excepción) */}
+          <div className="flex flex-wrap items-center gap-2 bg-white/80 px-3 py-1.5 rounded-2xl border border-red-200 text-xs font-bold text-slate-700">
+            {editandoGeneral ? (
               <>
-                <input type="number" min="0" step="0.01" value={punitorio.tasa} onChange={(e) => actualizarPunitorio({ tasa: e.target.value })}
-                  className="w-16 rounded-lg border border-line px-2 py-1 text-xs" aria-label="Tasa de punitorio" />
+                <span className="text-red-700">Punitorio general:</span>
+                <input type="number" min="0" step="0.01" value={formGeneral.tasa}
+                  onChange={(e) => setFormGeneral((f) => ({ ...f, tasa: e.target.value }))}
+                  className="w-16 rounded-lg border border-line px-2 py-1 text-xs" aria-label="Interés del punitorio general (%)" />
                 <span>% cada</span>
-                <CampoDias
-                  valor={punitorio.cadaDias}
-                  onCambiar={(v) => actualizarPunitorio({ cadaDias: v })}
-                  className="w-14 rounded-lg border border-line px-2 py-1 text-xs"
-                />
+                <CampoDias valor={formGeneral.cadaDias} onCambiar={(v) => setFormGeneral((f) => ({ ...f, cadaDias: v }))}
+                  className="w-14 rounded-lg border border-line px-2 py-1 text-xs" aria-label="Cada cuántos días" />
                 <span>días</span>
+                <button type="button" onClick={guardarConfigGeneral} disabled={guardandoGeneral}
+                  className="px-2.5 py-1 rounded-lg bg-[#0d6b63] text-white cursor-pointer disabled:opacity-50">
+                  {guardandoGeneral ? '...' : 'Guardar'}
+                </button>
+                <button type="button" onClick={() => setEditandoGeneral(false)}
+                  className="px-2 py-1 rounded-lg text-slate-500 hover:text-slate-800 cursor-pointer">
+                  Cancelar
+                </button>
+              </>
+            ) : (
+              <>
+                <span>
+                  Punitorio general: <span className="text-red-700">{describirPunitorio(general)}</span>
+                </span>
+                <button type="button" onClick={abrirEdicionGeneral}
+                  className="px-2.5 py-1 rounded-lg border border-line bg-white text-slate-700 hover:bg-slate-50 cursor-pointer">
+                  Cambiar
+                </button>
               </>
             )}
           </div>
         </div>
+
+        {(errorGuardado || errorGeneral) && (
+          <p className="text-xs text-amber-800 font-semibold bg-amber-50 p-2.5 rounded-xl border border-amber-200 mb-2">⚠️ {errorGuardado || errorGeneral}</p>
+        )}
 
         {error && <p className="text-xs text-red-600 font-semibold bg-red-50 p-2.5 rounded-xl border border-red-200 mb-2">⚠️ {error}</p>}
 
@@ -196,7 +248,7 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
           ) : (
             filtradas.map((f) => {
               const vencida = f.vencidas.length > 0
-              const montoPunitorio = punitorio.aplicar ? punitorioTotal(f.vencidas, punitorio.tasa, punitorio.cadaDias) : 0
+              const { config: configPun, monto: montoPunitorio } = punitorioDe(f)
               const dias = diasHasta(f.cuota.fechaVencimiento)
               const cuotaMostrar = vencida ? f.vencidas[0] : f.cuota
 
@@ -232,13 +284,16 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
                           <AlertTriangle className="w-4 h-4 shrink-0" />
                           Vencida · {f.vencidas[0].diasAtraso} {f.vencidas[0].diasAtraso === 1 ? 'día' : 'días'}
                         </span>
-                        {(f.vencidas.length > 1 || montoPunitorio > 0) && (
-                          <span className="block text-[11px] font-semibold text-red-100 mt-0.5">
-                            {f.vencidas.length > 1 ? `${f.vencidas.length} cuotas · $${fmt(f.deudaVencida)}` : ''}
-                            {f.vencidas.length > 1 && montoPunitorio > 0 ? ' · ' : ''}
-                            {montoPunitorio > 0 ? `Punitorio $${fmt(montoPunitorio)}` : ''}
-                          </span>
-                        )}
+                        <span className="block text-[11px] font-semibold text-red-100 mt-0.5">
+                          {[
+                            f.vencidas.length > 1 ? `${f.vencidas.length} cuotas · $${fmt(f.deudaVencida)}` : null,
+                            !configPun.aplica
+                              ? 'Exento de punitorio'
+                              : montoPunitorio > 0
+                                ? `Punitorio $${fmt(montoPunitorio)}${configPun.personalizada ? ' (propio)' : ''}`
+                                : null
+                          ].filter(Boolean).join(' · ')}
+                        </span>
                       </div>
                     ) : dias === 0 ? (
                       <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase px-3 py-1.5 rounded-xl bg-amber-100 text-amber-800 border border-amber-200">

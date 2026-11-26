@@ -96,6 +96,15 @@ body:has(.modal-overlay) {
   }
 }
 
+.aviso-entra {
+  animation: aviso-entra 0.2s ease-out;
+}
+
+@keyframes aviso-entra {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 @keyframes hoja-sube {
   from { transform: translateY(32px); }
   to { transform: translateY(0); }

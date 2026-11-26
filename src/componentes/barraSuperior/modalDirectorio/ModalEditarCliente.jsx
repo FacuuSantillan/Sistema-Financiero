@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
+import { avisar } from '../../../lib/avisos'
 import CamposPersona, { payloadPersona, personaDesdeRegistro, personaVacia } from '../../comunes/CamposPersona'
 
 const ETIQUETAS = {
@@ -76,6 +77,7 @@ export default function ModalEditarCliente({ isOpen, onClose, onSuccess, cliente
       }])
       if (errAudit) console.warn('Aviso al registrar auditoría:', errAudit.message)
 
+      avisar('Cambios del cliente guardados')
       if (onSuccess) onSuccess(data)
       onClose()
     } catch (err) {

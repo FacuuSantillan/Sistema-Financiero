@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Plus, Trash2, Edit2, Layers, CreditCard, Search, ArrowLeft } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
+import { avisar } from '../../../lib/avisos'
 
 export default function ModalCrearPlan({ isOpen, onClose, onSuccess }) {
   // Lista de planes existentes
@@ -144,6 +145,7 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess }) {
 
       setPlanes((prev) => prev.filter((p) => p.id !== id))
       if (planEnEdicionId === id) limpiarFormulario()
+      avisar('Opción de préstamo eliminada')
       if (onSuccess) onSuccess()
     } catch (err) {
       alert(`No se pudo eliminar: ${err.message}`)
@@ -212,6 +214,7 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess }) {
       }
 
       await cargarPlanes()
+      avisar(planEnEdicionId ? 'Opción de préstamo actualizada' : 'Opción de préstamo creada')
       limpiarFormulario()
       if (onSuccess) onSuccess()
     } catch (err) {

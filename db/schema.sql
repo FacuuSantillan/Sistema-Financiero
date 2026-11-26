@@ -112,6 +112,23 @@ CREATE TABLE IF NOT EXISTS prestamos (
 
 CREATE INDEX IF NOT EXISTS prestamos_cliente_id_idx ON prestamos(cliente_id);
 
+-- Punitorio por préstamo:
+--   punitorio_aplica = false  → el préstamo está exento de punitorio
+--   punitorio_tasa / punitorio_cada_dias en NULL → usa la configuración general
+ALTER TABLE prestamos ADD COLUMN IF NOT EXISTS punitorio_aplica BOOLEAN DEFAULT true;
+ALTER TABLE prestamos ADD COLUMN IF NOT EXISTS punitorio_tasa NUMERIC(6,3);
+ALTER TABLE prestamos ADD COLUMN IF NOT EXISTS punitorio_cada_dias INT;
+
+-- Configuración general del sistema (una sola fila, id = 1)
+CREATE TABLE IF NOT EXISTS configuracion (
+  id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  punitorio_tasa NUMERIC(6,3) NOT NULL DEFAULT 0.5,      -- % por período
+  punitorio_cada_dias INT NOT NULL DEFAULT 1 CHECK (punitorio_cada_dias >= 1),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+INSERT INTO configuracion (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
 -- Las cuotas no se guardan en una tabla: el cronograma se calcula en la app
 -- a partir del préstamo y sus pagos (ver src/lib/finanzas.js).
 
@@ -131,7 +148,10 @@ CREATE TABLE IF NOT EXISTS pagos (
 
 -- Punitorio cobrado junto con un pago (separado del monto de la cuota)
 ALTER TABLE pagos ADD COLUMN IF NOT EXISTS punitorio NUMERIC(12,2) DEFAULT 0;
--- Detalle del cálculo: { "tasa": 0.5, "cada_dias": 1, "cuotas": [...] }
+-- Detalle del cálculo:
+-- { "tasa": 0.5, "cada_dias": 1,
+--   "cuotas": [{ "numero": 2, "dias_atraso": 12, "periodos": 12, "saldo": 10000, "monto": 600 }] }
+-- "periodos" = períodos de mora que ya se cobraron de esa cuota (evita cobrarlos dos veces)
 ALTER TABLE pagos ADD COLUMN IF NOT EXISTS punitorio_detalle JSONB;
 
 CREATE INDEX IF NOT EXISTS pagos_prestamo_id_idx ON pagos(prestamo_id);
@@ -175,7 +195,7 @@ DECLARE
 BEGIN
   FOREACH tabla IN ARRAY ARRAY[
     'provincias', 'usuarios', 'clientes', 'garantes', 'planes_prestamo',
-    'prestamos', 'pagos', 'auditoria_actividades'
+    'prestamos', 'pagos', 'auditoria_actividades', 'configuracion'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tabla);

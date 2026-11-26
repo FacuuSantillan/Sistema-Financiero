@@ -44,6 +44,27 @@ export function mensajeRecordatorio({ nombre, numeroCuota, cantidadCuotas, monto
   return lineas.join('\n')
 }
 
+/** Comprobante de un cobro recién registrado. */
+export function mensajeComprobante({ nombre, monto, punitorio = 0, metodo, fecha, saldoRestante, prestamoId }) {
+  const total = Number(monto || 0) + Number(punitorio || 0)
+  const lineas = [
+    `Hola ${nombre || ''}, te confirmamos el pago recibido.`,
+    '',
+    `Fecha: ${fmtFecha(fecha || new Date())}`,
+    prestamoId ? `Préstamo: #${String(prestamoId).substring(0, 8)}` : null,
+    `Pago de cuota: $${fmt(monto)}`,
+    Number(punitorio) > 0 ? `Punitorio: $${fmt(punitorio)}` : null,
+    Number(punitorio) > 0 ? `Total abonado: $${fmt(total)}` : null,
+    metodo ? `Medio de pago: ${metodo}` : null,
+    saldoRestante !== undefined
+      ? (Number(saldoRestante) <= 0.5 ? '¡Préstamo cancelado por completo!' : `Saldo pendiente: $${fmt(saldoRestante)}`)
+      : null,
+    '',
+    '¡Gracias!'
+  ]
+  return lineas.filter((l) => l !== null).join('\n')
+}
+
 /** Abre WhatsApp con el mensaje. Devuelve false si el teléfono no es válido. */
 export async function abrirWhatsApp(telefono, mensaje) {
   const numero = normalizarTelefonoAR(telefono)

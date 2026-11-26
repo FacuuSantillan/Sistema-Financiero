@@ -1,23 +1,39 @@
 import React, { useState, useEffect } from 'react'
 import {
   X, User, CheckCircle2, Clock, Calendar,
-  DollarSign, Receipt, AlertCircle
+  DollarSign, Receipt, AlertCircle, Pencil, Trash2, AlertTriangle
 } from 'lucide-react'
+import ModalEditarPrestamo from '../../comunes/ModalEditarPrestamo'
 import { supabase } from '../../../lib/supabaseClient'
 import {
   hoyLocalISO, fechaFormularioATimestamp, cronogramaConVencimientos,
-  redondear2, TOLERANCIA_SALDO, punitorioTotal, leerConfigPunitorio, guardarConfigPunitorio
+  redondear2, TOLERANCIA_SALDO, configPunitorioPrestamo, periodosCobradosPorCuota,
+  punitorioPendiente, detallePunitorioParaGuardar
 } from '../../../lib/finanzas'
+import { usePunitorioGeneral } from '../../../lib/usePunitorioGeneral'
 import BotonWhatsApp from '../../comunes/BotonWhatsApp'
 import CalculadoraPunitorio from '../../comunes/CalculadoraPunitorio'
+import PunitorioPrestamo from '../../comunes/PunitorioPrestamo'
+import { avisar } from '../../../lib/avisos'
+import { abrirWhatsApp, mensajeComprobante, normalizarTelefonoAR } from '../../../lib/whatsapp'
 
 const formatearMonto = (n) => Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })
 
-export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioLogueado = null, onCobroRegistrado }) {
+export default function ModalFichaPrestamo({ isOpen, onClose, prestamo: prestamoProp, usuarioLogueado = null, onCobroRegistrado, onPrestamoEliminado }) {
+  // Edición y borrado del préstamo (solo owner/admin)
+  const puedeAdministrar = usuarioLogueado?.rol === 'owner' || usuarioLogueado?.rol === 'admin'
+  const [editandoPrestamo, setEditandoPrestamo] = useState(false)
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false)
+  const [borrando, setBorrando] = useState(false)
+  const [errorBorrado, setErrorBorrado] = useState('')
+
   const [pagos, setPagos] = useState([])
   const [cliente, setCliente] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [configPunitorio, setConfigPunitorio] = useState(() => ({ aplicar: false, ...leerConfigPunitorio() }))
+  // Versión del préstamo leída de la base (refleja cambios hechos en esta ficha)
+  const [prestamoDB, setPrestamoDB] = useState(null)
+  const prestamo = prestamoProp && prestamoDB?.id === prestamoProp.id ? { ...prestamoProp, ...prestamoDB } : prestamoProp
+  const { config: punitorioGeneral } = usePunitorioGeneral(isOpen)
 
   // Estados del sub-formulario de cobro directo
   const [mostrarFormCobro, setMostrarFormCobro] = useState(false)
@@ -45,6 +61,14 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
       if (errPagos) console.warn('Error al cargar pagos:', errPagos.message)
       setPagos(pagosData || [])
 
+      // Datos actualizados del préstamo (estado y configuración de punitorio)
+      const { data: prestamoFresco } = await supabase
+        .from('prestamos')
+        .select('*')
+        .eq('id', prestamo.id)
+        .maybeSingle()
+      setPrestamoDB(prestamoFresco || null)
+
       // 2. Cargar Datos del Cliente
       if (prestamo.cliente_id) {
         const { data: cliData } = await supabase
@@ -62,12 +86,13 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
   }
 
   useEffect(() => {
-    if (isOpen && prestamo) {
+    if (isOpen && prestamoProp) {
+      setPrestamoDB(null)
       cargarDetallesPrestamo()
       setMostrarFormCobro(false)
       setErrorCobro('')
     }
-  }, [isOpen, prestamo])
+  }, [isOpen, prestamoProp])
 
   if (!isOpen || !prestamo) return null
 
@@ -97,13 +122,17 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
   const estadoMostrado = prestamoCancelado ? 'finalizado' : prestamo.estado
   const cuotasVencidas = prestamoCancelado ? [] : tablaCuotas.filter((c) => c.vencida)
 
+  // --- PUNITORIO OBLIGATORIO (según la configuración del préstamo o la general) ---
+  const configPunitorio = configPunitorioPrestamo(prestamo, punitorioGeneral)
+  const periodosCobrados = periodosCobradosPorCuota(pagos)
+
   // Cuotas vencidas sobre las que se calcula el punitorio del cobro en curso
   const vencidasDelCobro = cuotaDestinoCobro
     ? cuotasVencidas.filter((c) => c.numeroCuota === cuotaDestinoCobro.numeroCuota)
     : cuotasVencidas
-  const punitorioCobro = configPunitorio.aplicar
-    ? punitorioTotal(vencidasDelCobro, configPunitorio.tasa, configPunitorio.cadaDias)
-    : 0
+  const pendienteCobro = punitorioPendiente(vencidasDelCobro, configPunitorio, periodosCobrados)
+  const punitorioCobro = pendienteCobro.total
+  const punitorioTotalPrestamo = punitorioPendiente(cuotasVencidas, configPunitorio, periodosCobrados).total
 
   const nombreCliente = cliente?.nombre_completo || prestamo.clientes?.nombre_completo || 'Cliente'
   const datosWhatsApp = (cuota) => ({
@@ -114,13 +143,12 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
     monto: cuota.restante,
     vencimiento: cuota.fechaVencimiento,
     diasAtraso: cuota.diasAtraso,
-    punitorio: configPunitorio.aplicar ? punitorioTotal([cuota], configPunitorio.tasa, configPunitorio.cadaDias) : 0
+    punitorio: punitorioPendiente([cuota], configPunitorio, periodosCobrados).total
   })
 
   // Abrir formulario de cobro para una cuota específica o general
   const handleAbrirCobro = (cuota = null) => {
     setCuotaDestinoCobro(cuota)
-    setConfigPunitorio((c) => ({ ...c, aplicar: false }))
     const montoSugerido = cuota
       ? Math.min(cuota.restanteDeEstaCuota, saldoRestante)
       : Math.min(valorCuotaCalculado, saldoRestante)
@@ -175,12 +203,7 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
       // El punitorio se guarda aparte: no descuenta saldo de las cuotas
       if (punitorioCobro > 0) {
         payloadPago.punitorio = punitorioCobro
-        payloadPago.punitorio_detalle = {
-          tasa: Number(configPunitorio.tasa),
-          cada_dias: Math.max(1, Math.floor(Number(configPunitorio.cadaDias) || 1)),
-          cuotas: vencidasDelCobro.map((c) => ({ numero: c.numeroCuota, dias_atraso: c.diasAtraso, saldo: c.restante }))
-        }
-        guardarConfigPunitorio({ tasa: Number(configPunitorio.tasa), cadaDias: Math.max(1, Math.floor(Number(configPunitorio.cadaDias) || 1)) })
+        payloadPago.punitorio_detalle = detallePunitorioParaGuardar(configPunitorio, pendienteCobro)
       }
 
       const { data: pagoCreado, error: errInsert } = await supabase
@@ -234,12 +257,71 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
 
       setMostrarFormCobro(false)
       await cargarDetallesPrestamo()
+
+      // Aviso con opción de mandar el comprobante por WhatsApp
+      const telefono = cliente?.telefono
+      const comprobante = mensajeComprobante({
+        nombre: nombreCliente,
+        monto: montoNum,
+        punitorio: punitorioCobro,
+        metodo: cobroData.metodo_pago,
+        fecha: new Date(`${cobroData.fecha_pago}T12:00:00`),
+        saldoRestante: Math.max(0, totalPagar - totalAcumuladoDB),
+        prestamoId: prestamo.id
+      })
+      avisar(
+        `Cobro de $${(montoNum + punitorioCobro).toLocaleString('es-AR', { minimumFractionDigits: 2 })} registrado`,
+        'exito',
+        normalizarTelefonoAR(telefono)
+          ? { accion: { texto: 'Enviar comprobante', onClick: () => abrirWhatsApp(telefono, comprobante) } }
+          : {}
+      )
       if (onCobroRegistrado) onCobroRegistrado()
     } catch (err) {
       console.error('Error al registrar cobro:', err)
       setErrorCobro(err.message || 'Error al procesar el cobro.')
     } finally {
       setGuardandoCobro(false)
+    }
+  }
+
+  // Borra el préstamo y sus cobros (con auditoría)
+  const handleBorrarPrestamo = async () => {
+    setBorrando(true)
+    setErrorBorrado('')
+    try {
+      // Primero los cobros, por si la base no tiene borrado en cascada
+      const { error: errPagos } = await supabase.from('pagos').delete().eq('prestamo_id', prestamo.id)
+      if (errPagos) throw errPagos
+
+      const { data: borrado, error } = await supabase.from('prestamos').delete().eq('id', prestamo.id).select()
+      if (error) throw error
+      if (!borrado || borrado.length === 0) throw new Error('La base de datos no permitió borrar el préstamo (permisos).')
+
+      const { error: errAudit } = await supabase.from('auditoria_actividades').insert([{
+        tipo: 'PRÉSTAMO',
+        accion: 'ELIMINADO',
+        titulo: `Préstamo #${String(prestamo.id).substring(0, 8)} eliminado`,
+        subtitulo: `Cliente: ${nombreCliente}`,
+        detalles: `Capital $${formatearMonto(capital)} · Total $${formatearMonto(totalPagar)} · Cobrado $${formatearMonto(totalCobrado)} en ${pagos.length} ${pagos.length === 1 ? 'pago' : 'pagos'}`,
+        persona: nombreCliente,
+        autor_id: usuarioLogueado?.id || null,
+        autor_nombre: usuarioLogueado?.nombre || 'Administración',
+        autor_rol: usuarioLogueado?.rol || 'admin',
+        estado: 'Eliminado',
+        metadata: { ...borrado[0], pagos_eliminados: pagos.length }
+      }])
+      if (errAudit) console.warn('Aviso al registrar auditoría:', errAudit.message)
+
+      avisar(`Préstamo de ${nombreCliente} eliminado`)
+      setConfirmarBorrado(false)
+      if (onPrestamoEliminado) onPrestamoEliminado(prestamo.id)
+      onClose()
+    } catch (err) {
+      console.error('Error al borrar préstamo:', err)
+      setErrorBorrado(err.message || 'No se pudo borrar el préstamo.')
+    } finally {
+      setBorrando(false)
     }
   }
 
@@ -264,7 +346,9 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
                 FICHA TÉCNICA DE PRÉSTAMO
               </span>
               <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
-                estadoMostrado === 'finalizado' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                estadoMostrado === 'finalizado' ? 'bg-blue-100 text-blue-800'
+                  : estadoMostrado === 'cancelado' ? 'bg-slate-200 text-slate-700'
+                  : 'bg-emerald-100 text-emerald-800'
               }`}>
                 {estadoMostrado === 'finalizado' ? 'FINALIZADO' : estadoMostrado || 'ACTIVO'}
               </span>
@@ -274,11 +358,22 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
             </h2>
           </div>
 
-          <div className="flex items-center gap-2">
-       
-
-            <button 
-              onClick={onClose} 
+          <div className="flex items-center gap-1.5">
+            {puedeAdministrar && (
+              <>
+                <button type="button" onClick={() => setEditandoPrestamo(true)} aria-label="Editar préstamo" title="Editar préstamo"
+                  className="flex items-center gap-1.5 p-2.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer">
+                  <Pencil className="w-4 h-4 text-[#0d6b63]" /> <span className="hidden sm:inline">Editar</span>
+                </button>
+                <button type="button" onClick={() => { setErrorBorrado(''); setConfirmarBorrado(true) }} aria-label="Borrar préstamo" title="Borrar préstamo"
+                  className="flex items-center gap-1.5 p-2.5 sm:px-3 sm:py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-700 hover:bg-red-100 cursor-pointer">
+                  <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Borrar</span>
+                </button>
+              </>
+            )}
+            <button
+              onClick={onClose}
+              aria-label="Cerrar"
               className="p-2 text-slate-400 hover:text-slate-700 rounded-xl cursor-pointer"
             >
               <X className="w-5 h-5" />
@@ -305,12 +400,32 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
               </div>
             </div>
             {cuotasVencidas.length > 0 && (
-              <span className="flex items-center gap-1.5 text-xs font-bold uppercase px-3 py-1.5 rounded-xl bg-red-600 text-white">
-                <AlertCircle className="w-4 h-4" />
-                {cuotasVencidas.length === 1 ? '1 cuota vencida' : `${cuotasVencidas.length} cuotas vencidas`}
-              </span>
+              <div className="flex flex-col items-start sm:items-end gap-1">
+                <span className="flex items-center gap-1.5 text-xs font-bold uppercase px-3 py-1.5 rounded-xl bg-red-600 text-white">
+                  <AlertCircle className="w-4 h-4" />
+                  {cuotasVencidas.length === 1 ? '1 cuota vencida' : `${cuotasVencidas.length} cuotas vencidas`}
+                </span>
+                {punitorioTotalPrestamo > 0 && (
+                  <span className="text-xs font-bold text-red-700">
+                    Punitorio pendiente: ${formatearMonto(punitorioTotalPrestamo)}
+                  </span>
+                )}
+              </div>
             )}
           </div>
+
+          {/* PUNITORIO DE ESTE PRÉSTAMO (exento / general / propio) */}
+          <PunitorioPrestamo
+            prestamo={prestamo}
+            general={punitorioGeneral}
+            puedeEditar={usuarioLogueado?.rol === 'owner' || usuarioLogueado?.rol === 'admin'}
+            usuarioLogueado={usuarioLogueado}
+            nombreCliente={nombreCliente}
+            onGuardado={(actualizado) => {
+              setPrestamoDB(actualizado)
+              if (onCobroRegistrado) onCobroRegistrado()
+            }}
+          />
 
           {/* RESUMEN FINANCIERO */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -441,9 +556,9 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
                 </div>
 
                 <CalculadoraPunitorio
-                  cuotasVencidas={vencidasDelCobro}
+                  vencidas={vencidasDelCobro}
                   config={configPunitorio}
-                  setConfig={setConfigPunitorio}
+                  pendiente={pendienteCobro}
                 />
 
                 {punitorioCobro > 0 && (
@@ -644,6 +759,58 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo, usuarioL
         </div>
 
       </div>
+
+      {/* Edición de todos los datos del préstamo */}
+      <ModalEditarPrestamo
+        isOpen={editandoPrestamo}
+        onClose={() => setEditandoPrestamo(false)}
+        prestamo={prestamo}
+        totalCobrado={totalCobrado}
+        usuarioLogueado={usuarioLogueado}
+        onGuardado={(actualizado) => {
+          setPrestamoDB(actualizado)
+          cargarDetallesPrestamo()
+          if (onCobroRegistrado) onCobroRegistrado()
+        }}
+      />
+
+      {/* Confirmación de borrado */}
+      {confirmarBorrado && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl bg-[#FAF8F5] p-6 shadow-2xl border border-[#E7E2D9] space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600 border border-red-200">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-serif font-bold text-slate-900">¿Borrar este préstamo?</h3>
+              <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                Se eliminará el préstamo #{String(prestamo.id).substring(0, 8)} de <strong>{nombreCliente}</strong>
+                {pagos.length > 0
+                  ? <> junto con sus <strong>{pagos.length} {pagos.length === 1 ? 'cobro registrado' : 'cobros registrados'}</strong> (${formatearMonto(totalCobrado)})</>
+                  : null}. Esta acción no se puede deshacer.
+              </p>
+              {pagos.length > 0 && (
+                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2">
+                  Si el préstamo solo quedó sin efecto, conviene usar <strong>Editar → Estado: Cancelado</strong> para conservar el historial de cobros.
+                </p>
+              )}
+            </div>
+            {errorBorrado && (
+              <p className="p-3 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-600">⚠️ {errorBorrado}</p>
+            )}
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              <button type="button" disabled={borrando} onClick={() => setConfirmarBorrado(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer">
+                Cancelar
+              </button>
+              <button type="button" disabled={borrando} onClick={handleBorrarPrestamo}
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center gap-2 cursor-pointer disabled:opacity-50">
+                <Trash2 className="w-3.5 h-3.5" /> {borrando ? 'Borrando...' : 'Sí, borrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -47,25 +47,25 @@ export default function BotonesDeAccion({
     },
     {
       id: "cliente", 
-      label: "Agregar cliente", 
+      label: "Crear cliente", 
       icon: Users, 
       roles: ["owner", "admin"] 
     },
     { 
       id: "opcionPrestamo", 
-      label: "Agregar opción de préstamo", 
+      label: "Crear tipos de préstamo", 
       icon: HandCoins, 
       roles: ["owner", "admin"] 
     },
     { 
       id: "prestamo", 
-      label: "Agregar préstamo", 
+      label: "Crear préstamo", 
       icon: BadgePercent, 
       roles: ["owner", "admin"] 
     },
     { 
       id: "pago", 
-      label: "Agregar cobro/pago", 
+      label: "Cobro/Pago", 
       icon: ReceiptText, 
       roles: ["owner", "admin", "inversionista"] 
     },

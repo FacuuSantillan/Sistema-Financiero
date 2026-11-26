@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
+import { avisar } from '../../../lib/avisos'
 import { subirDocumentos } from '../../../lib/documentos'
 import CamposPersona, { payloadPersona, personaVacia } from '../../comunes/CamposPersona'
 import SelectorFotos from '../../comunes/SelectorFotos'
@@ -60,6 +61,24 @@ export default function ModalCliente({ isOpen, onClose, onSuccess, usuarioLoguea
     try {
       const datos = payloadPersona(formData)
 
+      // Evita cargar dos veces a la misma persona (mismo número de documento)
+      if (datos.dni) {
+        const digitos = datos.dni.replace(/\D/g, '')
+        // Se comparan solo los números: "30.123.456" y "30123456" son el mismo documento
+        const { data: existentes } = await supabase
+          .from('clientes')
+          .select('id, nombre_completo, dni')
+          .not('dni', 'is', null)
+
+        const duplicado = (existentes || []).find((c) => (c.dni || '').replace(/\D/g, '') === digitos)
+        if (duplicado && !window.confirm(
+          `Ya existe un cliente con el documento ${datos.dni}: ${duplicado.nombre_completo}.\n\n¿Querés crearlo igual?`
+        )) {
+          setLoading(false)
+          return
+        }
+      }
+
       const { data: cliente, error } = await supabase
         .from('clientes')
         .insert([{ ...datos, creado_por: usuarioLogueado?.id || null, inversionista_id: null, activo: true }])
@@ -102,6 +121,7 @@ export default function ModalCliente({ isOpen, onClose, onSuccess, usuarioLoguea
         window.alert(`El cliente se guardó, pero hubo un problema con las fotos:\n${avisoFotos}\n\nPodés volver a subirlas desde su ficha.`)
       }
 
+      avisar(`Cliente ${datos.nombre_completo} guardado. Ahora podés cargar su garante.`)
       setClienteCreado(cliente) // → paso 2 (garante)
     } catch (err) {
       console.error('Error al guardar cliente:', err)
