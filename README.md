@@ -1,16 +1,32 @@
-# React + Vite
+# Sistema Financiero
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicación de gestión de préstamos: inversionistas, clientes, planes de préstamo, préstamos y cobros, con estadísticas y registro de auditoría.
 
-Currently, two official plugins are available:
+## Tecnologías
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19 + Vite + Tailwind CSS
+- Supabase (PostgreSQL + autenticación)
+- Tauri (app de escritorio) y Capacitor (iOS)
 
-## React Compiler
+## Configuración
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Instalar dependencias: `npm install`
+2. Copiar `.env.example` a `.env` y completar los datos de Supabase.
+3. En Supabase → SQL Editor, ejecutar [db/schema.sql](db/schema.sql) completo. Crea las tablas, las reglas de seguridad (RLS), el bucket de fotos y las provincias. Se puede volver a ejecutar sin perder datos.
+4. Crear el usuario owner siguiendo el paso 5 del final de `db/schema.sql`.
 
-## Expanding the ESLint configuration
+## Comandos
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Comando | Descripción |
+|---|---|
+| `npm run dev` | Servidor de desarrollo web |
+| `npm run build` | Compilación de producción en `dist/` |
+| `npm run tauri dev` | App de escritorio en modo desarrollo |
+| `npm run tauri build` | Instalador de escritorio |
+| `npx cap sync ios` | Copia `dist/` al proyecto de iOS |
+
+## Roles
+
+- **owner**: acceso total, crea administradores y ve los registros de auditoría.
+- **admin**: gestiona inversionistas, clientes, planes y préstamos; ve estadísticas.
+- **inversionista**: ve sus clientes y registra cobros.

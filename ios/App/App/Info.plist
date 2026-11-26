@@ -66,5 +66,13 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Se usa la cámara para fotografiar la documentación de clientes y garantes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Se accede a las fotos para adjuntar documentación de clientes y garantes.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+	</array>
 </dict>
 </plist>
