@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Calculator } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
 import { avisar } from '../../../lib/avisos'
+import { abrirTicket } from '../../../lib/tickets'
 import { hoyLocalISO, redondear2 } from '../../../lib/finanzas'
 import { usePunitorioGeneral } from '../../../lib/usePunitorioGeneral'
 import { CampoDias, describirPunitorio } from '../../comunes/CalculadoraPunitorio'
@@ -202,6 +203,8 @@ export default function ModalNuevoPrestamo({ isOpen, onClose, onSuccess, usuario
       if (auditError) console.warn('Aviso al registrar auditoría:', auditError.message)
 
       avisar(`Préstamo de $${montoCapital.toLocaleString('es-AR')} creado para ${nombreCliente}`)
+      // Ticket del préstamo para imprimir, exportar o mandar por WhatsApp
+      if (prestamoCreado?.id) abrirTicket('prestamo', prestamoCreado.id)
       if (onSuccess) onSuccess()
       onClose()
     } catch (err) {

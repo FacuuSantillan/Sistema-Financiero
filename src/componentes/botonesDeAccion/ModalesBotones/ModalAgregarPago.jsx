@@ -8,6 +8,7 @@ import {
 import { usePunitorioGeneral } from '../../../lib/usePunitorioGeneral'
 import CalculadoraPunitorio from '../../comunes/CalculadoraPunitorio'
 import { avisar } from '../../../lib/avisos'
+import { abrirTicket } from '../../../lib/tickets'
 import { abrirWhatsApp, mensajeComprobante, normalizarTelefonoAR } from '../../../lib/whatsapp'
 
 export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado = null }) {
@@ -401,6 +402,8 @@ export default function ModalPago({ isOpen, onClose, onSuccess, usuarioLogueado 
           ? { accion: { texto: 'Enviar comprobante', onClick: () => abrirWhatsApp(telefono, mensajeComprobante(datosComprobante)) } }
           : {}
       )
+      // Recibo del cobro para imprimir, exportar o mandar por WhatsApp
+      if (pagoCreado?.id) abrirTicket('cobro', pagoCreado.id)
 
       if (onSuccess) onSuccess()
       onClose()

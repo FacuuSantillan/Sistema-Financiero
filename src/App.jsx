@@ -17,6 +17,8 @@ import ModalFichaPrestamo from './componentes/botonesDeAccion/ModalesBotones/Mod
 import PanoramaEstadisticas from './componentes/PanoramaEstadisticas/PanoramaEstadisticas'
 import ModalAdmin from './componentes/botonesDeAccion/ModalesBotones/ModalAdmin'
 import ModalCobranzas from './componentes/Cobranzas/ModalCobranzas'
+import ModalExportar from './componentes/Reportes/ModalExportar'
+import VisorTicket from './componentes/Tickets/VisorTicket'
 import Avisos from './componentes/comunes/Avisos'
 
 // Carga diferida: el gráfico (recharts) y el registro de actividades son pesados
@@ -183,6 +185,7 @@ export default function App() {
     <>
     {/* Fuera del bloque que se re-monta al refrescar datos, para que los avisos no se pierdan */}
     <Avisos />
+    <VisorTicket />
     <div key={`${usuario.id}-${usuario.rol}-${refreshKey}`} className="min-h-screen bg-paper pb-28 sm:pb-12 safe-pt safe-px">
       {/* Barra de usuario y Logout */}
       <div className="w-[95%] mx-auto pt-3 flex items-center justify-between gap-3 text-xs font-medium text-slate-600 border-b border-line/60 pb-2 mb-2">
@@ -215,6 +218,7 @@ export default function App() {
         onOpenModal={(tipo) => setModalActivo(tipo)}
         onOpenClientes={handleOpenDirectorioClientes}
         onOpenCobranzas={() => setModalActivo('cobranzas')}
+        onOpenExportar={() => setModalActivo('exportar')}
       />
 
       {/* Modales */}
@@ -255,6 +259,11 @@ export default function App() {
         onClose={() => setModalActivo(null)}
         onSuccess={handleRefreshData}
         usuarioLogueado={usuario}
+      />
+
+      <ModalExportar
+        isOpen={modalActivo === 'exportar'}
+        onClose={() => setModalActivo(null)}
       />
 
       <ModalCobranzas

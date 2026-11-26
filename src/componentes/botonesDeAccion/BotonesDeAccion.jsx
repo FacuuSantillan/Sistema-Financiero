@@ -5,7 +5,8 @@ import {
   HandCoins,
   ReceiptText,
   BadgePercent,
-  CalendarClock
+  CalendarClock,
+  FileSpreadsheet
 } from "lucide-react";
 import FiltroProvincia from "../barraSuperior/filtroPorProvincia";
 
@@ -14,6 +15,7 @@ export default function BotonesDeAccion({
   onOpenModal,
   onOpenClientes,
   onOpenCobranzas,
+  onOpenExportar,
   provinciaSeleccionada,
   setProvinciaSeleccionada,
   provincias = [],
@@ -33,6 +35,13 @@ export default function BotonesDeAccion({
       label: "Cuotas y vencimientos",
       icon: CalendarClock,
       onClick: onOpenCobranzas,
+      roles: ["owner", "admin"]
+    },
+    {
+      id: "exportar",
+      label: "Exportar a Excel",
+      icon: FileSpreadsheet,
+      onClick: onOpenExportar,
       roles: ["owner", "admin"]
     },
   ];

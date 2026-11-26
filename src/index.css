@@ -96,6 +96,38 @@ body:has(.modal-overlay) {
   }
 }
 
+/* ==========================================================
+   TICKETS (préstamo / recibo de cobro)
+   ========================================================== */
+.ticket-doc {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  line-height: 1.35;
+}
+
+.ticket-80 { width: 100%; max-width: 72mm; }   /* rollo térmico de 80 mm */
+.ticket-a4 { width: 100%; max-width: 180mm; }  /* hoja A4 / PDF */
+
+/* La copia para imprimir no se ve en pantalla */
+@media screen {
+  .area-impresion { display: none !important; }
+}
+
+@media print {
+  @page { margin: 6mm; }
+
+  /* Se imprime SOLO el ticket: el resto de la app se oculta */
+  body > *:not(.area-impresion) { display: none !important; }
+  body { background: #fff !important; }
+
+  .area-impresion {
+    display: block !important;
+    margin: 0 auto;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 .aviso-entra {
   animation: aviso-entra 0.2s ease-out;
 }

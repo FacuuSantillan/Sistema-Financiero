@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import {
   X, User, CheckCircle2, Clock, Calendar,
-  DollarSign, Receipt, AlertCircle, Pencil, Trash2, AlertTriangle
+  DollarSign, Receipt, AlertCircle, Pencil, Trash2, AlertTriangle, Printer
 } from 'lucide-react'
 import ModalEditarPrestamo from '../../comunes/ModalEditarPrestamo'
 import { supabase } from '../../../lib/supabaseClient'
@@ -15,6 +15,7 @@ import BotonWhatsApp from '../../comunes/BotonWhatsApp'
 import CalculadoraPunitorio from '../../comunes/CalculadoraPunitorio'
 import PunitorioPrestamo from '../../comunes/PunitorioPrestamo'
 import { avisar } from '../../../lib/avisos'
+import { abrirTicket } from '../../../lib/tickets'
 import { abrirWhatsApp, mensajeComprobante, normalizarTelefonoAR } from '../../../lib/whatsapp'
 
 const formatearMonto = (n) => Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })
@@ -276,6 +277,7 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo: prestamo
           ? { accion: { texto: 'Enviar comprobante', onClick: () => abrirWhatsApp(telefono, comprobante) } }
           : {}
       )
+      if (pagoCreado?.id) abrirTicket('cobro', pagoCreado.id)
       if (onCobroRegistrado) onCobroRegistrado()
     } catch (err) {
       console.error('Error al registrar cobro:', err)
@@ -359,6 +361,10 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo: prestamo
           </div>
 
           <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => abrirTicket('prestamo', prestamo.id)} aria-label="Ticket del préstamo" title="Ticket del préstamo (imprimir / Excel / WhatsApp)"
+              className="flex items-center gap-1.5 p-2.5 sm:px-3 sm:py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer">
+              <Printer className="w-4 h-4 text-[#0d6b63]" /> <span className="hidden sm:inline">Ticket</span>
+            </button>
             {puedeAdministrar && (
               <>
                 <button type="button" onClick={() => setEditandoPrestamo(true)} aria-label="Editar préstamo" title="Editar préstamo"
@@ -747,9 +753,15 @@ export default function ModalFichaPrestamo({ isOpen, onClose, prestamo: prestamo
                         ({(p.metodo_pago || 'efectivo').toUpperCase()}) {p.observaciones ? `· ${p.observaciones}` : ''}
                       </span>
                     </div>
-                    <span className="text-slate-500 font-semibold bg-slate-100 px-2.5 py-1 rounded-lg">
-                      {formatearFechaSimple(p.fecha_pago || p.created_at)}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-slate-500 font-semibold bg-slate-100 px-2.5 py-1 rounded-lg">
+                        {formatearFechaSimple(p.fecha_pago || p.created_at)}
+                      </span>
+                      <button type="button" onClick={() => abrirTicket('cobro', p.id)} aria-label="Ver recibo" title="Recibo (imprimir / Excel / WhatsApp)"
+                        className="p-2 rounded-lg bg-[#0d6b63]/10 text-[#0d6b63] hover:bg-[#0d6b63] hover:text-white cursor-pointer">
+                        <Receipt className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
