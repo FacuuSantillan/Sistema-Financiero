@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Plus, Trash2, Edit2, Layers, CreditCard, Search, ArrowLeft } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
 import { avisar } from '../../../lib/avisos'
+import ConfigPunitorioGeneral from '../../comunes/ConfigPunitorioGeneral'
 
 export default function ModalCrearPlan({ isOpen, onClose, onSuccess }) {
   // Lista de planes existentes
@@ -253,6 +254,11 @@ export default function ModalCrearPlan({ isOpen, onClose, onSuccess }) {
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Punitorio general: se aplica a todos los préstamos */}
+        <div className="pt-4 shrink-0">
+          <ConfigPunitorioGeneral activo={isOpen} />
         </div>
 
         {/* Contenido en dos columnas */}

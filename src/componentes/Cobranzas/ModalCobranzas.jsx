@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X, Search, AlertTriangle, Eye, RefreshCw, CalendarClock, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
-import { avisar } from '../../lib/avisos'
 import {
   cronogramaConVencimientos, TOLERANCIA_SALDO, configPunitorioPrestamo,
   periodosCobradosPorCuota, punitorioPendiente
 } from '../../lib/finanzas'
 import { usePunitorioGeneral } from '../../lib/usePunitorioGeneral'
 import BotonWhatsApp from '../comunes/BotonWhatsApp'
-import { CampoDias, describirPunitorio } from '../comunes/CalculadoraPunitorio'
+import { describirPunitorio } from '../comunes/CalculadoraPunitorio'
 
 const fmt = (n) => Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmtFecha = (d) => d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -29,12 +28,8 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
   const [busqueda, setBusqueda] = useState('')
   const [filtro, setFiltro] = useState('todos')
 
-  // Configuración general de punitorio (compartida, guardada en la base)
-  const { config: general, error: errorGeneral, guardar: guardarGeneral } = usePunitorioGeneral(isOpen)
-  const [editandoGeneral, setEditandoGeneral] = useState(false)
-  const [formGeneral, setFormGeneral] = useState({ tasa: '', cadaDias: '' })
-  const [guardandoGeneral, setGuardandoGeneral] = useState(false)
-  const [errorGuardado, setErrorGuardado] = useState('')
+  // Configuración general de punitorio (solo lectura acá; se edita en "Agregar opción de préstamo")
+  const { config: general, error: errorGeneral } = usePunitorioGeneral(isOpen)
 
   const cargar = async () => {
     setLoading(true)
@@ -128,26 +123,6 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
   const montoVencido = filas.reduce((acc, f) => acc + f.deudaVencida, 0)
   const punitorioTotalCartera = filas.reduce((acc, f) => acc + punitorioDe(f).monto, 0)
 
-  const abrirEdicionGeneral = () => {
-    setFormGeneral({ tasa: String(general.tasa), cadaDias: String(general.cadaDias) })
-    setErrorGuardado('')
-    setEditandoGeneral(true)
-  }
-
-  const guardarConfigGeneral = async () => {
-    setGuardandoGeneral(true)
-    setErrorGuardado('')
-    try {
-      await guardarGeneral(formGeneral)
-      avisar('Punitorio general actualizado: se aplica a todos los préstamos sin configuración propia')
-      setEditandoGeneral(false)
-    } catch (err) {
-      setErrorGuardado(err.message || 'No se pudo guardar.')
-    } finally {
-      setGuardandoGeneral(false)
-    }
-  }
-
   if (!isOpen) return null
 
   return (
@@ -198,43 +173,18 @@ export default function ModalCobranzas({ isOpen, onClose, onVerFichaPrestamo, ve
               </button>
             ))}
           </div>
-          {/* Punitorio general (obligatorio para todos los préstamos salvo excepción) */}
-          <div className="flex flex-wrap items-center gap-2 bg-white/80 px-3 py-1.5 rounded-2xl border border-red-200 text-xs font-bold text-slate-700">
-            {editandoGeneral ? (
-              <>
-                <span className="text-red-700">Punitorio general:</span>
-                <input type="number" min="0" step="0.01" value={formGeneral.tasa}
-                  onChange={(e) => setFormGeneral((f) => ({ ...f, tasa: e.target.value }))}
-                  className="w-16 rounded-lg border border-line px-2 py-1 text-xs" aria-label="Interés del punitorio general (%)" />
-                <span>% cada</span>
-                <CampoDias valor={formGeneral.cadaDias} onCambiar={(v) => setFormGeneral((f) => ({ ...f, cadaDias: v }))}
-                  className="w-14 rounded-lg border border-line px-2 py-1 text-xs" aria-label="Cada cuántos días" />
-                <span>días</span>
-                <button type="button" onClick={guardarConfigGeneral} disabled={guardandoGeneral}
-                  className="px-2.5 py-1 rounded-lg bg-[#0d6b63] text-white cursor-pointer disabled:opacity-50">
-                  {guardandoGeneral ? '...' : 'Guardar'}
-                </button>
-                <button type="button" onClick={() => setEditandoGeneral(false)}
-                  className="px-2 py-1 rounded-lg text-slate-500 hover:text-slate-800 cursor-pointer">
-                  Cancelar
-                </button>
-              </>
-            ) : (
-              <>
-                <span>
-                  Punitorio general: <span className="text-red-700">{describirPunitorio(general)}</span>
-                </span>
-                <button type="button" onClick={abrirEdicionGeneral}
-                  className="px-2.5 py-1 rounded-lg border border-line bg-white text-slate-700 hover:bg-slate-50 cursor-pointer">
-                  Cambiar
-                </button>
-              </>
-            )}
+          {/* Punitorio general: solo informativo (se configura en "Agregar opción de préstamo") */}
+          <div
+            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 bg-white/80 px-3 py-2 rounded-2xl border border-red-200 text-xs font-bold text-slate-700"
+            title='Se cambia en "Agregar opción de préstamo"'
+          >
+            <span>Punitorio general: <span className="text-red-700">{describirPunitorio(general)}</span></span>
+            <span className="text-[10px] font-semibold text-slate-400">Se configura en "Agregar opción de préstamo"</span>
           </div>
         </div>
 
-        {(errorGuardado || errorGeneral) && (
-          <p className="text-xs text-amber-800 font-semibold bg-amber-50 p-2.5 rounded-xl border border-amber-200 mb-2">⚠️ {errorGuardado || errorGeneral}</p>
+        {errorGeneral && (
+          <p className="text-xs text-amber-800 font-semibold bg-amber-50 p-2.5 rounded-xl border border-amber-200 mb-2">⚠️ {errorGeneral}</p>
         )}
 
         {error && <p className="text-xs text-red-600 font-semibold bg-red-50 p-2.5 rounded-xl border border-red-200 mb-2">⚠️ {error}</p>}
